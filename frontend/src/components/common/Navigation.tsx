@@ -5,6 +5,7 @@ import { Button } from './Button';
 const NAV_ITEMS = [
   { path: '/dashboard', label: '대시보드' },
   { path: '/trade', label: '거래 입력' },
+  { path: '/simulation', label: '시뮬레이션' },
   { path: '/history', label: '거래 이력' },
   { path: '/backtest', label: '백테스트' },
   { path: '/settings', label: '설정' },
