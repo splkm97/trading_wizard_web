@@ -1,0 +1,43 @@
+# Trading Wizard Web - Ingress
+# Requires an Ingress Controller (e.g., nginx-ingress, traefik)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trading-wizard-ingress
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+  annotations:
+    # For nginx-ingress controller
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # Uncomment for TLS
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx  # Change based on your ingress controller
+  rules:
+    # Change to your domain
+    - host: trading-wizard.local
+      http:
+        paths:
+          # Frontend (default)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+          # Backend API
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+  # Uncomment for TLS
+  # tls:
+  #   - hosts:
+  #       - trading-wizard.local
+  #     secretName: trading-wizard-tls

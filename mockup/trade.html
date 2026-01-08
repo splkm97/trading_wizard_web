@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>거래입력 - Daily Trading Wizard</title>
+    <link rel="stylesheet" href="common.css">
+    <style>
+        .trade-type-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .trade-type-btn {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid #334155;
+            background: transparent;
+            color: #94a3b8;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .trade-type-btn.buy.active {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+        .trade-type-btn.sell.active {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+        .stock-search {
+            position: relative;
+        }
+        .stock-search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+        .stock-search-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+        }
+        .stock-search-item:hover {
+            background: #334155;
+        }
+        .order-summary {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+        }
+        .order-summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #334155;
+        }
+        .order-summary-row:last-child {
+            border-bottom: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding-top: 0.75rem;
+        }
+        .order-summary-label { color: #64748b; }
+        .pending-order-card {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #3b82f6;
+        }
+        .pending-order-card.buy {
+            border-left-color: #ef4444;
+        }
+        .pending-order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .pending-order-stock {
+            font-weight: 600;
+        }
+        .pending-order-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+        .pending-order-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .signal-card {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .signal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .signal-stock {
+            font-weight: 500;
+        }
+        .signal-reason {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-top: 0.5rem;
+        }
+        .signal-indicators {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            font-size: 0.8rem;
+        }
+        .signal-indicators span {
+            background: #334155;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Daily Trading Wizard</h1>
+        <nav>
+            <a href="dashboard.html">대시보드</a>
+            <a href="backtest.html">백테스트</a>
+            <a href="trade.html" class="active">거래입력</a>
+            <a href="settings.html">설정</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="page-title">
+            <h2>거래 입력</h2>
+            <p>매수/매도 주문을 입력하고 체결 내역을 관리합니다</p>
+        </div>
+
+        <div class="grid-2">
+            <!-- Trade Entry Form -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>신규 거래 입력</h2>
+                </div>
+                <div class="section-body">
+                    <div class="trade-type-toggle">
+                        <button class="trade-type-btn buy active">매수</button>
+                        <button class="trade-type-btn sell">매도</button>
+                    </div>
+
+                    <div class="form-group stock-search">
+                        <label>종목 검색</label>
+                        <input type="text" placeholder="종목코드 또는 종목명 입력" value="005930">
+                        <div class="stock-search-results" style="display:none;">
+                            <div class="stock-search-item">
+                                <span>005930 삼성전자</span>
+                                <span class="neutral">71,200</span>
+                            </div>
+                            <div class="stock-search-item">
+                                <span>005935 삼성전자우</span>
+                                <span class="neutral">58,400</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <strong>삼성전자 (005930)</strong><br>
+                        현재가: 71,200 | 전일대비: <span class="positive">+1.2%</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>주문 수량</label>
+                            <input type="number" value="10" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label>주문 가격</label>
+                            <input type="number" value="71200" placeholder="시장가">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>거래 사유</label>
+                        <select>
+                            <option>squeeze_breakout_buy (볼린저 상단 돌파)</option>
+                            <option>manual_buy (수동 매수)</option>
+                            <option>signal_buy (시그널 매수)</option>
+                        </select>
+                    </div>
+
+                    <div class="order-summary">
+                        <div class="order-summary-row">
+                            <span class="order-summary-label">주문 금액</span>
+                            <span>712,000</span>
+                        </div>
+                        <div class="order-summary-row">
+                            <span class="order-summary-label">예상 수수료</span>
+                            <span>356</span>
+                        </div>
+                        <div class="order-summary-row">
+                            <span class="order-summary-label">총 결제 금액</span>
+                            <span class="positive">712,356</span>
+                        </div>
+                    </div>
+
+                    <div class="btn-group" style="margin-top:1.5rem">
+                        <button class="btn btn-primary" style="flex:1">주문 추가</button>
+                        <button class="btn btn-secondary">초기화</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Orders -->
+            <div>
+                <div class="section">
+                    <div class="section-header">
+                        <h2>대기 중인 주문</h2>
+                        <span class="badge">2건</span>
+                    </div>
+                    <div class="section-body">
+                        <div class="pending-order-card buy">
+                            <div class="pending-order-header">
+                                <span class="pending-order-stock">
+                                    <span class="tag buy">매수</span>
+                                    005930 삼성전자
+                                </span>
+                                <span class="tag warning">대기중</span>
+                            </div>
+                            <div class="pending-order-details">
+                                <div>
+                                    <div style="color:#64748b;font-size:0.75rem">추천가</div>
+                                    <div>71,200</div>
+                                </div>
+                                <div>
+                                    <div style="color:#64748b;font-size:0.75rem">수량</div>
+                                    <div>10주</div>
+                                </div>
+                                <div>
+                                    <div style="color:#64748b;font-size:0.75rem">금액</div>
+                                    <div>712,000</div>
+                                </div>
+                            </div>
+                            <div class="pending-order-actions">
+                                <button class="btn btn-primary" style="padding:0.5rem 1rem;font-size:0.85rem">체결 입력</button>
+                                <button class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.85rem">수정</button>
+                                <button class="btn btn-danger" style="padding:0.5rem 1rem;font-size:0.85rem">취소</button>
+                            </div>
+                        </div>
+
+                        <div class="pending-order-card">
+                            <div class="pending-order-header">
+                                <span class="pending-order-stock">
+                                    <span class="tag sell">매도</span>
+                                    035720 카카오
+                                </span>
+                                <span class="tag warning">대기중</span>
+                            </div>
+                            <div class="pending-order-details">
+                                <div>
+                                    <div style="color:#64748b;font-size:0.75rem">추천가</div>
+                                    <div>52,100</div>
+                                </div>
+                                <div>
+                                    <div style="color:#64748b;font-size:0.75rem">수량</div>
+                                    <div>1주</div>
+                                </div>
+                                <div>
+                                    <div style="color:#64748b;font-size:0.75rem">금액</div>
+                                    <div>52,100</div>
+                                </div>
+                            </div>
+                            <div class="pending-order-actions">
+                                <button class="btn btn-primary" style="padding:0.5rem 1rem;font-size:0.85rem">체결 입력</button>
+                                <button class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.85rem">수정</button>
+                                <button class="btn btn-danger" style="padding:0.5rem 1rem;font-size:0.85rem">취소</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Today's Signals -->
+                <div class="section">
+                    <div class="section-header">
+                        <h2>오늘의 매매 신호</h2>
+                        <span class="badge">3건</span>
+                    </div>
+                    <div class="section-body">
+                        <div class="signal-card">
+                            <div class="signal-header">
+                                <span class="signal-stock">
+                                    <span class="tag buy">매수</span>
+                                    005930 삼성전자
+                                </span>
+                                <span>신뢰도 85점</span>
+                            </div>
+                            <div class="signal-reason">볼린저 밴드 상단 돌파 (Squeeze Breakout)</div>
+                            <div class="signal-indicators">
+                                <span>RSI: 58.2</span>
+                                <span>MACD: +0.32</span>
+                                <span>거래량: 1.8x</span>
+                            </div>
+                        </div>
+
+                        <div class="signal-card">
+                            <div class="signal-header">
+                                <span class="signal-stock">
+                                    <span class="tag sell">매도</span>
+                                    035720 카카오
+                                </span>
+                                <span class="negative">손절 신호</span>
+                            </div>
+                            <div class="signal-reason">매수가 대비 -5.2% 하락</div>
+                            <div class="signal-indicators">
+                                <span>매수가: 54,300</span>
+                                <span>현재가: 51,480</span>
+                            </div>
+                        </div>
+
+                        <div class="signal-card">
+                            <div class="signal-header">
+                                <span class="signal-stock">
+                                    <span class="tag buy">매수</span>
+                                    000660 SK하이닉스
+                                </span>
+                                <span>신뢰도 72점</span>
+                            </div>
+                            <div class="signal-reason">볼린저 밴드 상단 돌파 (Squeeze Breakout)</div>
+                            <div class="signal-indicators">
+                                <span>RSI: 62.1</span>
+                                <span>MACD: +0.18</span>
+                                <span>거래량: 1.5x</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Today's Executed -->
+        <div class="section">
+            <div class="section-header">
+                <h2>오늘 체결된 거래</h2>
+                <span class="badge">2건</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>체결 시간</th>
+                        <th>종류</th>
+                        <th>종목</th>
+                        <th class="right">추천가</th>
+                        <th class="right">체결가</th>
+                        <th class="right">수량</th>
+                        <th class="right">체결금액</th>
+                        <th>상태</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>09:05:32</td>
+                        <td><span class="tag buy">매수</span></td>
+                        <td>079550 LIG넥스원</td>
+                        <td class="right">130,000</td>
+                        <td class="right">130,500</td>
+                        <td class="right">1</td>
+                        <td class="right">130,500</td>
+                        <td><span class="tag success">체결완료</span></td>
+                    </tr>
+                    <tr>
+                        <td>09:12:18</td>
+                        <td><span class="tag sell">매도</span></td>
+                        <td>006800 미래에셋증권</td>
+                        <td class="right">7,600</td>
+                        <td class="right">7,580</td>
+                        <td class="right">1</td>
+                        <td class="right">7,580</td>
+                        <td><span class="tag success">체결완료</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

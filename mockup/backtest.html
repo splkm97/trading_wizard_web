@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>백테스트 - Daily Trading Wizard</title>
+    <link rel="stylesheet" href="common.css">
+    <style>
+        .backtest-form {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            align-items: end;
+        }
+        .chart-placeholder {
+            background: linear-gradient(180deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+            height: 300px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            border: 1px dashed #334155;
+        }
+        .result-summary {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+            text-align: center;
+        }
+        .result-item {
+            padding: 1rem;
+            background: #0f172a;
+            border-radius: 8px;
+        }
+        .result-item .label {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+        .result-item .value {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .year-compare {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+        .year-card {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 1.25rem;
+            text-align: center;
+        }
+        .year-card .year {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .year-card .return {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .year-card .details {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        .progress-bar {
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+            margin-top: 0.75rem;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            border-radius: 4px;
+        }
+        @media (max-width: 1024px) {
+            .backtest-form { grid-template-columns: repeat(2, 1fr); }
+            .result-summary { grid-template-columns: repeat(3, 1fr); }
+            .year-compare { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Daily Trading Wizard</h1>
+        <nav>
+            <a href="dashboard.html">대시보드</a>
+            <a href="backtest.html" class="active">백테스트</a>
+            <a href="trade.html">거래입력</a>
+            <a href="settings.html">설정</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="page-title">
+            <h2>백테스트</h2>
+            <p>과거 데이터를 기반으로 전략 성과를 검증합니다</p>
+        </div>
+
+        <!-- Backtest Form -->
+        <div class="section">
+            <div class="section-header">
+                <h2>백테스트 설정</h2>
+            </div>
+            <div class="section-body">
+                <div class="backtest-form">
+                    <div class="form-group">
+                        <label>연도</label>
+                        <select>
+                            <option>2025</option>
+                            <option>2024</option>
+                            <option selected>2023</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>종목 리스트</label>
+                        <select>
+                            <option>kospi_top100_2025jan.txt</option>
+                            <option>kospi_top100_2024jan.txt</option>
+                            <option selected>kospi_top100_2023jan.txt</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>초기 자본</label>
+                        <input type="text" value="1,000,000">
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-primary" style="width:100%">백테스트 실행</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Year Comparison -->
+        <div class="section">
+            <div class="section-header">
+                <h2>3개년 백테스트 비교</h2>
+                <span class="badge">3년 누적 +90.21%</span>
+            </div>
+            <div class="section-body">
+                <div class="year-compare">
+                    <div class="year-card">
+                        <div class="year">2023</div>
+                        <div class="return positive">+10.12%</div>
+                        <div class="details">거래 176건 | 승률 19.8%</div>
+                        <div class="progress-bar">
+                            <div class="fill" style="width: 60%; background: linear-gradient(90deg, #ef4444, #f87171);"></div>
+                        </div>
+                    </div>
+                    <div class="year-card">
+                        <div class="year">2024</div>
+                        <div class="return positive">+3.99%</div>
+                        <div class="details">거래 208건 | 승률 20.0%</div>
+                        <div class="progress-bar">
+                            <div class="fill" style="width: 40%; background: linear-gradient(90deg, #ef4444, #f87171);"></div>
+                        </div>
+                    </div>
+                    <div class="year-card">
+                        <div class="year">2025</div>
+                        <div class="return positive">+66.11%</div>
+                        <div class="details">거래 135건 | 승률 36.1%</div>
+                        <div class="progress-bar">
+                            <div class="fill" style="width: 100%; background: linear-gradient(90deg, #ef4444, #f87171);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Summary -->
+        <div class="section">
+            <div class="section-header">
+                <h2>2023년 백테스트 결과</h2>
+            </div>
+            <div class="section-body">
+                <div class="result-summary">
+                    <div class="result-item">
+                        <div class="label">총 수익률</div>
+                        <div class="value positive">+10.12%</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="label">최대 낙폭 (MDD)</div>
+                        <div class="value negative">-10.82%</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="label">총 거래 수</div>
+                        <div class="value">176건</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="label">승률</div>
+                        <div class="value">19.8%</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="label">샤프 비율</div>
+                        <div class="value">0.85</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Equity Curve -->
+        <div class="section">
+            <div class="section-header">
+                <h2>자산 추이</h2>
+            </div>
+            <div class="section-body">
+                <div class="chart-placeholder">
+                    차트 영역 (Plotly / Chart.js)
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Returns -->
+        <div class="section">
+            <div class="section-header">
+                <h2>월별 수익률</h2>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>월</th>
+                        <th class="right">수익률</th>
+                        <th class="right">거래수</th>
+                        <th class="right">승률</th>
+                        <th class="right">최대 낙폭</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>2023-01</td>
+                        <td class="right positive">+3.2%</td>
+                        <td class="right">15</td>
+                        <td class="right">26.7%</td>
+                        <td class="right negative">-2.1%</td>
+                    </tr>
+                    <tr>
+                        <td>2023-02</td>
+                        <td class="right negative">-1.5%</td>
+                        <td class="right">12</td>
+                        <td class="right">16.7%</td>
+                        <td class="right negative">-4.3%</td>
+                    </tr>
+                    <tr>
+                        <td>2023-03</td>
+                        <td class="right positive">+2.8%</td>
+                        <td class="right">18</td>
+                        <td class="right">22.2%</td>
+                        <td class="right negative">-3.2%</td>
+                    </tr>
+                    <tr>
+                        <td>2023-04</td>
+                        <td class="right positive">+1.2%</td>
+                        <td class="right">14</td>
+                        <td class="right">21.4%</td>
+                        <td class="right negative">-2.8%</td>
+                    </tr>
+                    <tr>
+                        <td>2023-05</td>
+                        <td class="right negative">-2.3%</td>
+                        <td class="right">16</td>
+                        <td class="right">12.5%</td>
+                        <td class="right negative">-5.1%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Saved Results -->
+        <div class="section">
+            <div class="section-header">
+                <h2>저장된 백테스트 결과</h2>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>파일명</th>
+                        <th>기간</th>
+                        <th class="right">수익률</th>
+                        <th class="right">거래수</th>
+                        <th>생성일</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>backtest_2025_jan_result.json</td>
+                        <td>2025-01-02 ~ 2025-12-31</td>
+                        <td class="right positive">+66.11%</td>
+                        <td class="right">135</td>
+                        <td>2026-01-04</td>
+                        <td class="right"><button class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.8rem">불러오기</button></td>
+                    </tr>
+                    <tr>
+                        <td>backtest_2024_jan_result.json</td>
+                        <td>2024-01-02 ~ 2024-12-31</td>
+                        <td class="right positive">+3.99%</td>
+                        <td class="right">208</td>
+                        <td>2026-01-04</td>
+                        <td class="right"><button class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.8rem">불러오기</button></td>
+                    </tr>
+                    <tr>
+                        <td>backtest_2023_jan_result.json</td>
+                        <td>2023-01-02 ~ 2023-12-31</td>
+                        <td class="right positive">+10.12%</td>
+                        <td class="right">176</td>
+                        <td>2026-01-04</td>
+                        <td class="right"><button class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.8rem">불러오기</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

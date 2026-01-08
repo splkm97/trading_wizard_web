@@ -1,0 +1,39 @@
+# Trading Wizard Web - Istio VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: trading-wizard-vs
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+spec:
+  hosts:
+    - "trading-wizard.example.com"
+    - "trading-wizard.local"
+  gateways:
+    - trading-wizard-gateway
+  http:
+    # API routes to backend
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: backend
+            port:
+              number: 8000
+      timeout: 60s
+      retries:
+        attempts: 3
+        perTryTimeout: 20s
+        retryOn: gateway-error,connect-failure,refused-stream
+    # All other routes to frontend
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: frontend
+            port:
+              number: 80
+      timeout: 30s

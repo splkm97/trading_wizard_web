@@ -1,0 +1,23 @@
+# Trading Wizard Web - Kustomization
+# Deploy with: kubectl apply -k k8s/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trading-wizard
+
+resources:
+  - namespace.yaml
+  - backend-pvc.yaml
+  - backend-secret.yaml
+  - backend-deployment.yaml
+  - frontend-deployment.yaml
+  - ingress.yaml
+  # Istio resources (requires Istio to be installed on cluster)
+  # - istio-gateway.yaml
+  # - istio-virtualservice.yaml
+  # - istio-destinationrule.yaml
+
+# Common labels for all resources
+commonLabels:
+  app.kubernetes.io/name: trading-wizard
+  app.kubernetes.io/managed-by: kustomize

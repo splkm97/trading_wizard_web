@@ -1,0 +1,31 @@
+# Trading Wizard Web - Istio Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: trading-wizard-gateway
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "trading-wizard.example.com"
+        - "trading-wizard.local"
+      # Uncomment below to redirect HTTP to HTTPS
+      # tls:
+      #   httpsRedirect: true
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "trading-wizard.example.com"
+      tls:
+        mode: SIMPLE
+        credentialName: trading-wizard-tls  # Must create this secret with TLS cert

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trading-wizard-config
+  namespace: trading-wizard
+  labels:
+    app.kubernetes.io/name: trading-wizard
+data:
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRE_MINUTES: "30"
+  CORS_ORIGINS: "https://trading-wizard.example.com"
+  LOG_LEVEL: "INFO"

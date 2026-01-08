@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>설정 - Daily Trading Wizard</title>
+    <link rel="stylesheet" href="common.css">
+    <style>
+        .settings-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .settings-nav a {
+            padding: 0.75rem 1rem;
+            color: #94a3b8;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .settings-nav a:hover {
+            background: #334155;
+            color: #f1f5f9;
+        }
+        .settings-nav a.active {
+            background: #3b82f6;
+            color: white;
+        }
+        .settings-layout {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 1.5rem;
+        }
+        .avatar-section {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+        }
+        .avatar-info h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+        }
+        .avatar-info p {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid #334155;
+        }
+        .setting-row:last-child {
+            border-bottom: none;
+        }
+        .setting-label h4 {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+        .setting-label p {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: #334155;
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toggle.active {
+            background: #3b82f6;
+        }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.2s;
+        }
+        .toggle.active::after {
+            left: 24px;
+        }
+        .range-input {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .range-input input[type="range"] {
+            width: 150px;
+            accent-color: #3b82f6;
+        }
+        .range-value {
+            min-width: 50px;
+            text-align: right;
+        }
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: #0f172a;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        .data-item-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .data-item-icon {
+            width: 40px;
+            height: 40px;
+            background: #334155;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .data-item-name {
+            font-weight: 500;
+        }
+        .data-item-size {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .danger-zone {
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.05);
+        }
+        .danger-zone .section-header {
+            border-bottom-color: rgba(239, 68, 68, 0.3);
+        }
+        .danger-zone h2 {
+            color: #ef4444;
+        }
+        @media (max-width: 768px) {
+            .settings-layout {
+                grid-template-columns: 1fr;
+            }
+            .settings-nav {
+                flex-direction: row;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Daily Trading Wizard</h1>
+        <nav>
+            <a href="dashboard.html">대시보드</a>
+            <a href="backtest.html">백테스트</a>
+            <a href="trade.html">거래입력</a>
+            <a href="settings.html" class="active">설정</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="page-title">
+            <h2>설정</h2>
+            <p>계정 및 전략 설정을 관리합니다</p>
+        </div>
+
+        <div class="settings-layout">
+            <!-- Settings Navigation -->
+            <div class="section" style="height:fit-content">
+                <nav class="settings-nav">
+                    <a href="#account" class="active">계정</a>
+                    <a href="#strategy">전략 설정</a>
+                    <a href="#notification">알림</a>
+                    <a href="#data">데이터 관리</a>
+                    <a href="#danger">위험 영역</a>
+                </nav>
+            </div>
+
+            <!-- Settings Content -->
+            <div>
+                <!-- Account Section -->
+                <div class="section" id="account">
+                    <div class="section-header">
+                        <h2>계정 정보</h2>
+                    </div>
+                    <div class="section-body">
+                        <div class="avatar-section">
+                            <div class="avatar">K</div>
+                            <div class="avatar-info">
+                                <h3>kalee</h3>
+                                <p>kalee@example.com</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>이름</label>
+                                <input type="text" value="kalee">
+                            </div>
+                            <div class="form-group">
+                                <label>이메일</label>
+                                <input type="email" value="kalee@example.com">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>비밀번호</label>
+                            <input type="password" value="••••••••">
+                        </div>
+
+                        <button class="btn btn-primary" style="margin-top:1rem">변경사항 저장</button>
+                    </div>
+                </div>
+
+                <!-- Strategy Section -->
+                <div class="section" id="strategy">
+                    <div class="section-header">
+                        <h2>전략 설정</h2>
+                    </div>
+                    <div class="section-body">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>초기 자본</h4>
+                                <p>백테스트 및 포트폴리오 시작 금액</p>
+                            </div>
+                            <div class="form-group" style="margin:0;width:200px">
+                                <input type="text" value="1,000,000">
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>최대 포지션 수</h4>
+                                <p>동시에 보유할 수 있는 최대 종목 수</p>
+                            </div>
+                            <div class="range-input">
+                                <input type="range" min="5" max="30" value="15">
+                                <span class="range-value">15개</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>포지션당 비중</h4>
+                                <p>각 종목에 투자할 자본 비율</p>
+                            </div>
+                            <div class="range-input">
+                                <input type="range" min="5" max="20" value="10">
+                                <span class="range-value">10%</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>신뢰도 임계값</h4>
+                                <p>매수 신호 최소 신뢰도 점수</p>
+                            </div>
+                            <div class="range-input">
+                                <input type="range" min="40" max="80" value="60">
+                                <span class="range-value">60점</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>손절선</h4>
+                                <p>자동 손절매 기준 수익률</p>
+                            </div>
+                            <div class="range-input">
+                                <input type="range" min="-15" max="-3" value="-5">
+                                <span class="range-value negative">-5%</span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" style="margin-top:1rem">설정 저장</button>
+                    </div>
+                </div>
+
+                <!-- Notification Section -->
+                <div class="section" id="notification">
+                    <div class="section-header">
+                        <h2>알림 설정</h2>
+                    </div>
+                    <div class="section-body">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>매매 신호 알림</h4>
+                                <p>새로운 매수/매도 신호 발생 시 알림</p>
+                            </div>
+                            <div class="toggle active"></div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>손절 경고</h4>
+                                <p>손절선 근접 시 경고 알림</p>
+                            </div>
+                            <div class="toggle active"></div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>일일 리포트</h4>
+                                <p>매일 장 마감 후 포트폴리오 요약 발송</p>
+                            </div>
+                            <div class="toggle"></div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>이메일 알림</h4>
+                                <p>중요 알림을 이메일로 수신</p>
+                            </div>
+                            <div class="toggle active"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Management Section -->
+                <div class="section" id="data">
+                    <div class="section-header">
+                        <h2>데이터 관리</h2>
+                    </div>
+                    <div class="section-body">
+                        <div class="data-item">
+                            <div class="data-item-info">
+                                <div class="data-item-icon">JSON</div>
+                                <div>
+                                    <div class="data-item-name">portfolio_state.json</div>
+                                    <div class="data-item-size">현재 포트폴리오 상태 | 12.5 KB</div>
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.85rem">내보내기</button>
+                                <button class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.85rem">가져오기</button>
+                            </div>
+                        </div>
+
+                        <div class="data-item">
+                            <div class="data-item-info">
+                                <div class="data-item-icon">JSON</div>
+                                <div>
+                                    <div class="data-item-name">backtest_2023_jan_result.json</div>
+                                    <div class="data-item-size">2023년 백테스트 결과 | 45.2 KB</div>
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.85rem">내보내기</button>
+                                <button class="btn btn-danger" style="padding:0.5rem 1rem;font-size:0.85rem">삭제</button>
+                            </div>
+                        </div>
+
+                        <div class="data-item">
+                            <div class="data-item-info">
+                                <div class="data-item-icon">TXT</div>
+                                <div>
+                                    <div class="data-item-name">kospi_top100_2023jan.txt</div>
+                                    <div class="data-item-size">2023년 1월 KOSPI Top 100 | 2.1 KB</div>
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.85rem">내보내기</button>
+                                <button class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.85rem">편집</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:1.5rem">
+                            <button class="btn btn-primary">전체 데이터 백업</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="section danger-zone" id="danger">
+                    <div class="section-header">
+                        <h2>위험 영역</h2>
+                    </div>
+                    <div class="section-body">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>포트폴리오 초기화</h4>
+                                <p>모든 포지션과 거래 이력을 삭제하고 초기 상태로 되돌립니다</p>
+                            </div>
+                            <button class="btn btn-danger">초기화</button>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>백테스트 결과 삭제</h4>
+                                <p>저장된 모든 백테스트 결과를 삭제합니다</p>
+                            </div>
+                            <button class="btn btn-danger">삭제</button>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <h4>계정 삭제</h4>
+                                <p>계정과 모든 데이터를 영구적으로 삭제합니다</p>
+                            </div>
+                            <button class="btn btn-danger">계정 삭제</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

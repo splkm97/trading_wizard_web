@@ -1,0 +1,17 @@
+# Trading Wizard Web - Backend PersistentVolumeClaim
+# This ensures SQLite database persists across pod restarts
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-data-pvc
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+    component: backend
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # Use default storage class, or specify: storageClassName: standard

@@ -1,0 +1,70 @@
+# Trading Wizard Web - Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trading-wizard
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: trading-wizard
+        component: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: splkm97/trading-wizard-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: BACKEND_URL
+              value: "http://backend.trading-wizard.svc.cluster.local:8000"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+    component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: trading-wizard
+    component: frontend
