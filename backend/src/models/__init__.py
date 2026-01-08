@@ -7,6 +7,13 @@ from src.models.position import Position
 from src.models.trade import Trade, TradeAction
 from src.models.backtest import BacktestResult
 from src.models.stock_list import StockList
+from src.models.game_session import (
+    GameSession,
+    GameStatus,
+    SimulatedPosition,
+    SimulatedTrade,
+    SimulatedTradeAction,
+)
 
 __all__ = [
     "BaseModel",
@@ -18,4 +25,9 @@ __all__ = [
     "TradeAction",
     "BacktestResult",
     "StockList",
+    "GameSession",
+    "GameStatus",
+    "SimulatedPosition",
+    "SimulatedTrade",
+    "SimulatedTradeAction",
 ]

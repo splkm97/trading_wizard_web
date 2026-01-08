@@ -9,6 +9,7 @@ import TradePage from './pages/TradePage';
 import { HistoryPage } from './pages/HistoryPage';
 import { BacktestPage } from './pages/BacktestPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SimulationPage } from './pages/SimulationPage';
 
 function App() {
   return (
@@ -55,6 +56,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/simulation"
+            element={
+              <ProtectedRoute>
+                <SimulationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/simulation/:sessionId"
+            element={
+              <ProtectedRoute>
+                <SimulationPage />
               </ProtectedRoute>
             }
           />
