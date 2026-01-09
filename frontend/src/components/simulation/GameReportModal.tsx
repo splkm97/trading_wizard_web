@@ -21,7 +21,7 @@ import {
 } from 'recharts';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { getReport, downloadTradesJson } from '../../services/simulation';
+import { getReport, downloadTradesJson, saveAsBacktest } from '../../services/simulation';
 import type { GameReport } from '../../types/simulation';
 
 interface GameReportModalProps {
@@ -43,6 +43,8 @@ export function GameReportModal({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSavingBacktest, setIsSavingBacktest] = useState(false);
+  const [saveBacktestSuccess, setSaveBacktestSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && sessionId) {
@@ -73,6 +75,20 @@ export function GameReportModal({
       console.error('Failed to export trades:', err);
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleSaveAsBacktest = async () => {
+    setIsSavingBacktest(true);
+    setSaveBacktestSuccess(null);
+    try {
+      const response = await saveAsBacktest(sessionId);
+      setSaveBacktestSuccess(response.message);
+    } catch (err) {
+      console.error('Failed to save as backtest:', err);
+      setError('백테스트 기록 저장에 실패했습니다.');
+    } finally {
+      setIsSavingBacktest(false);
     }
   };
 
@@ -285,17 +301,30 @@ export function GameReportModal({
 
           {/* Footer */}
           <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-            <p className="text-sm text-gray-500">
-              {report && `마지막 업데이트: ${report.current_date}`}
-            </p>
+            <div>
+              <p className="text-sm text-gray-500">
+                {report && `마지막 업데이트: ${report.current_date}`}
+              </p>
+              {saveBacktestSuccess && (
+                <p className="text-sm text-green-600 mt-1">{saveBacktestSuccess}</p>
+              )}
+            </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSaveAsBacktest}
+                disabled={isSavingBacktest || isLoading || !report || !!saveBacktestSuccess}
+              >
+                {isSavingBacktest ? '저장 중...' : saveBacktestSuccess ? '저장됨' : '백테스트 기록에 저장'}
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={handleExport}
                 disabled={isExporting || isLoading || !report}
               >
-                {isExporting ? '내보내는 중...' : '거래 내역 내보내기'}
+                {isExporting ? '내보내는 중...' : 'JSON 내보내기'}
               </Button>
               <Button size="sm" onClick={onClose}>
                 닫기

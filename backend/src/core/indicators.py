@@ -91,12 +91,22 @@ def calculate_volume_ratio(volume: pd.Series, window: int = 20) -> pd.Series:
     return volume / volume_ma
 
 
-def calculate_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_all_indicators(
+    df: pd.DataFrame,
+    bollinger_period: int = 12,
+    bollinger_std_dev: float = 1.3,
+    squeeze_threshold_pct: int = 55,
+    squeeze_lookback_days: int = 10,
+) -> pd.DataFrame:
     """
     Calculate all technical indicators needed for signal generation.
 
     Args:
         df: DataFrame with OHLCV data (columns: Open, High, Low, Close, Volume)
+        bollinger_period: Bollinger Bands moving average window (default 12)
+        bollinger_std_dev: Number of standard deviations (default 1.3)
+        squeeze_threshold_pct: Squeeze threshold as % of MA (default 55)
+        squeeze_lookback_days: Days to look back for squeeze MA (default 10)
 
     Returns:
         DataFrame with added indicator columns
@@ -105,13 +115,16 @@ def calculate_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     close = df["Close"]
     volume = df["Volume"]
 
-    # Bollinger Bands
-    bb_upper, bb_middle, bb_lower, bb_width, bb_width_ma = calculate_bollinger_bands(close)
+    # Bollinger Bands with configurable parameters
+    bb_upper, bb_middle, bb_lower, bb_width, bb_width_ma = calculate_bollinger_bands(
+        close, window=bollinger_period, num_std=bollinger_std_dev
+    )
     df["BB_Upper"] = bb_upper
     df["BB_Middle"] = bb_middle
     df["BB_Lower"] = bb_lower
     df["BB_Width"] = bb_width
-    df["BB_Width_MA"] = bb_width_ma
+    # Recalculate width MA with configurable lookback
+    df["BB_Width_MA"] = bb_width.rolling(window=squeeze_lookback_days).mean()
 
     # RSI
     df["RSI"] = calculate_rsi(close)
@@ -126,7 +139,9 @@ def calculate_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["Volume_MA"] = volume.rolling(window=20).mean()
     df["Volume_Ratio"] = calculate_volume_ratio(volume)
 
-    df["In_Squeeze"] = df["BB_Width"] < (df["BB_Width_MA"] * 0.55)
+    # Squeeze detection with configurable threshold
+    squeeze_ratio = squeeze_threshold_pct / 100.0
+    df["In_Squeeze"] = df["BB_Width"] < (df["BB_Width_MA"] * squeeze_ratio)
 
     df["MA_200"] = close.rolling(window=200).mean()
 

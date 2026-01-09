@@ -121,3 +121,24 @@ export async function precomputeRecommendations(
     {}
   );
 }
+
+export interface SaveAsBacktestResponse {
+  backtest_id: string;
+  name: string;
+  message: string;
+}
+
+/**
+ * Save simulation session as a backtest record.
+ * Converts the simulation game results to BacktestResult format and saves it
+ * to the backtest history for comparison.
+ */
+export async function saveAsBacktest(
+  sessionId: string,
+  customName?: string
+): Promise<SaveAsBacktestResponse> {
+  return api.post<SaveAsBacktestResponse>(
+    `${BASE_PATH}/sessions/${sessionId}/save-as-backtest`,
+    customName ? { name: customName } : {}
+  );
+}

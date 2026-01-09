@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
+COPY scripts/ ./scripts/
 
 # Copy data files (kospi_top100.txt, stock_names_kr.json)
 COPY data/ ./data/

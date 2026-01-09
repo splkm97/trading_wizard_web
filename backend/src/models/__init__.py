@@ -14,6 +14,7 @@ from src.models.game_session import (
     SimulatedTrade,
     SimulatedTradeAction,
 )
+from src.models.historical_price import HistoricalPrice
 
 __all__ = [
     "BaseModel",
@@ -30,4 +31,5 @@ __all__ = [
     "SimulatedPosition",
     "SimulatedTrade",
     "SimulatedTradeAction",
+    "HistoricalPrice",
 ]

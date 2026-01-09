@@ -517,3 +517,45 @@ async def precompute_recommendations(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game session not found")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+class SaveAsBacktestRequest(BaseModel):
+    name: Optional[str] = Field(None, max_length=100, description="Custom name for backtest record")
+
+
+class SaveAsBacktestResponse(BaseModel):
+    backtest_id: str
+    name: str
+    message: str
+
+
+@router.post("/sessions/{session_id}/save-as-backtest", response_model=SaveAsBacktestResponse)
+async def save_as_backtest(
+    session_id: str,
+    request: SaveAsBacktestRequest = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save simulation session as a backtest record.
+
+    Converts the simulation game results to BacktestResult format and saves it
+    to the backtest history. This allows comparing manual trading performance
+    with automated backtest results.
+    """
+    service = SimulationService(db)
+
+    try:
+        session = service.get_session(session_id, current_user.id)
+
+        custom_name = request.name if request else None
+        backtest = service.save_as_backtest(session, name=custom_name)
+
+        return SaveAsBacktestResponse(
+            backtest_id=backtest.id,
+            name=backtest.name,
+            message="시뮬레이션 결과가 백테스트 기록에 저장되었습니다.",
+        )
+    except GameNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game session not found")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

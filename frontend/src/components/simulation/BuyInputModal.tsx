@@ -136,12 +136,12 @@ export function BuyInputModal({
       />
       
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div role="dialog" aria-modal="true" aria-labelledby="buy-modal-title" className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-white">매수 주문</h3>
+              <h3 id="buy-modal-title" className="text-lg font-bold text-white">매수 주문</h3>
               <p className="text-green-100 text-sm">{stockName} ({stockCode})</p>
             </div>
             <button
@@ -210,6 +210,7 @@ export function BuyInputModal({
                 <div className="flex-1">
                   <Input
                     label="매수 수량"
+                    name="quantity"
                     type="number"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
@@ -238,6 +239,7 @@ export function BuyInputModal({
                 <div className="flex-1">
                   <Input
                     label="매수 금액"
+                    name="amount"
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}

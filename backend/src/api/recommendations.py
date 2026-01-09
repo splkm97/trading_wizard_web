@@ -115,10 +115,28 @@ async def get_recommendations(
         position_count = len(portfolio.positions)
 
     settings = db.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
+
+    # Read all settings from UserSettings or use defaults
     stop_loss_pct = float(settings.stop_loss_pct) if settings else 4.5
     take_profit_pct = float(settings.take_profit_pct) if settings else 12.0
     take_profit_ratio = float(settings.take_profit_ratio) if settings else 1.0
     sell_on_middle_band = settings.sell_on_middle_band if settings else False
+
+    # Bollinger Band parameters
+    bollinger_period = settings.bollinger_period if settings else 15
+    bollinger_std_dev = float(settings.bollinger_std_dev) if settings else 1.5
+
+    # Squeeze detection parameters
+    squeeze_threshold_pct = settings.squeeze_threshold_pct if settings else 60
+    squeeze_lookback_days = settings.squeeze_lookback_days if settings else 10
+
+    # Position sizing parameters
+    max_positions = settings.max_positions if settings else 15
+    max_position_pct = float(settings.max_position_pct) if settings else 10.0
+
+    # Use confidence_threshold from settings if not overridden by query param
+    if confidence_threshold == 60:  # default value
+        confidence_threshold = settings.confidence_threshold if settings else 55
 
     # Load KOSPI Top 100
     try:
@@ -139,6 +157,12 @@ async def get_recommendations(
         take_profit_pct=take_profit_pct,
         take_profit_ratio=take_profit_ratio,
         sell_on_middle_band=sell_on_middle_band,
+        bollinger_period=bollinger_period,
+        bollinger_std_dev=bollinger_std_dev,
+        squeeze_threshold_pct=squeeze_threshold_pct,
+        squeeze_lookback_days=squeeze_lookback_days,
+        max_positions=max_positions,
+        max_position_pct=max_position_pct,
     )
     signals = scanner.scan_for_buy_signals(
         stock_codes=stock_codes,
@@ -146,10 +170,10 @@ async def get_recommendations(
         max_results=max_results * 2,  # Get more signals for filtering
     )
 
-    # Generate recommendations with position sizing
+    # Generate recommendations with position sizing from user settings
     engine = RecommendationEngine(
-        max_positions=15,
-        max_position_percent=10.0,
+        max_positions=max_positions,
+        max_position_percent=max_position_pct,
         confidence_threshold=confidence_threshold,
     )
 

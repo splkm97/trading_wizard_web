@@ -135,19 +135,33 @@ def fetch_stock_data(stock_code: str, days: int = 60) -> Optional[pd.DataFrame]:
         return None
 
 
-def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate all technical indicators needed for signal generation."""
+def calculate_indicators(
+    df: pd.DataFrame,
+    bollinger_period: int = 20,
+    bollinger_std_dev: float = 2.0,
+    squeeze_threshold_pct: int = 70,
+    squeeze_lookback_days: int = 10,
+) -> pd.DataFrame:
+    """Calculate all technical indicators needed for signal generation.
+
+    Args:
+        df: DataFrame with OHLCV data
+        bollinger_period: Bollinger Bands moving average window
+        bollinger_std_dev: Number of standard deviations
+        squeeze_threshold_pct: Squeeze threshold as % of MA
+        squeeze_lookback_days: Days to look back for squeeze MA
+    """
     close = df["Close"].copy()
     volume = df["Volume"].copy()
 
-    # Bollinger Bands (20-day, 2 std dev)
-    sma = close.rolling(window=20).mean()
-    std = close.rolling(window=20).std()
-    df["BB_Upper"] = sma + (std * 2.0)
+    # Bollinger Bands with configurable parameters
+    sma = close.rolling(window=bollinger_period).mean()
+    std = close.rolling(window=bollinger_period).std()
+    df["BB_Upper"] = sma + (std * bollinger_std_dev)
     df["BB_Middle"] = sma
-    df["BB_Lower"] = sma - (std * 2.0)
+    df["BB_Lower"] = sma - (std * bollinger_std_dev)
     df["BB_Width"] = (df["BB_Upper"] - df["BB_Lower"]) / sma * 100
-    df["BB_Width_MA"] = df["BB_Width"].rolling(window=10).mean()
+    df["BB_Width_MA"] = df["BB_Width"].rolling(window=squeeze_lookback_days).mean()
 
     # RSI (14-day)
     delta = close.diff()
@@ -167,8 +181,9 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["Volume_MA"] = volume.rolling(window=20).mean()
     df["Volume_Ratio"] = volume / df["Volume_MA"]
 
-    # Squeeze detection
-    df["In_Squeeze"] = df["BB_Width"] < (df["BB_Width_MA"] * 0.7)
+    # Squeeze detection with configurable threshold
+    squeeze_ratio = squeeze_threshold_pct / 100.0
+    df["In_Squeeze"] = df["BB_Width"] < (df["BB_Width_MA"] * squeeze_ratio)
 
     return df
 
@@ -219,6 +234,15 @@ class SignalScanner:
         take_profit_ratio: float = 1.0,
         sell_on_middle_band: bool = False,
         use_cache: bool = True,
+        # Bollinger Band parameters
+        bollinger_period: int = 20,
+        bollinger_std_dev: float = 2.0,
+        # Squeeze detection parameters
+        squeeze_threshold_pct: int = 70,
+        squeeze_lookback_days: int = 10,
+        # Position sizing parameters
+        max_positions: int = 15,
+        max_position_pct: float = 10.0,
     ):
         if not 1.0 <= stop_loss_percent <= 20.0:
             raise ValueError("stop_loss_percent must be between 1.0 and 20.0")
@@ -233,6 +257,19 @@ class SignalScanner:
         self.take_profit_ratio = take_profit_ratio
         self.sell_on_middle_band = sell_on_middle_band
         self.use_cache = use_cache
+
+        # Bollinger Band parameters
+        self.bollinger_period = bollinger_period
+        self.bollinger_std_dev = bollinger_std_dev
+
+        # Squeeze detection parameters
+        self.squeeze_threshold_pct = squeeze_threshold_pct
+        self.squeeze_lookback_days = squeeze_lookback_days
+
+        # Position sizing parameters
+        self.max_positions = max_positions
+        self.max_position_pct = max_position_pct
+
         self._cache: Dict[str, pd.DataFrame] = {}
 
     def _load_cache(self) -> None:
@@ -254,14 +291,29 @@ class SignalScanner:
         """Get stock data from cache or fetch from yfinance."""
         self._load_cache()
 
-        # Try cache first
+        # Try cache first - but recalculate indicators with current settings
         if stock_code in self._cache:
-            return self._cache[stock_code]
+            df = self._cache[stock_code].copy()
+            # Recalculate indicators with user settings
+            df = calculate_indicators(
+                df,
+                bollinger_period=self.bollinger_period,
+                bollinger_std_dev=self.bollinger_std_dev,
+                squeeze_threshold_pct=self.squeeze_threshold_pct,
+                squeeze_lookback_days=self.squeeze_lookback_days,
+            )
+            return df
 
         # Fallback to yfinance
         df = fetch_stock_data(stock_code)
         if df is not None and len(df) >= 30:
-            df = calculate_indicators(df)
+            df = calculate_indicators(
+                df,
+                bollinger_period=self.bollinger_period,
+                bollinger_std_dev=self.bollinger_std_dev,
+                squeeze_threshold_pct=self.squeeze_threshold_pct,
+                squeeze_lookback_days=self.squeeze_lookback_days,
+            )
             return df
         return None
 

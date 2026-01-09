@@ -35,7 +35,7 @@ export function PortfolioSummary({ session, isLoading = false }: PortfolioSummar
           <h3 className="font-semibold text-gray-900">포트폴리오</h3>
         </div>
         <div className="p-6 flex flex-col items-center justify-center h-48">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" data-testid="loading-indicator" />
         </div>
       </Card>
     );
@@ -71,7 +71,7 @@ export function PortfolioSummary({ session, isLoading = false }: PortfolioSummar
       <div className="p-4 space-y-4">
         <div className="text-center py-2">
           <p className="text-sm text-gray-500 mb-1">현재 날짜</p>
-          <p className="text-lg font-bold text-gray-900">{formatDate(session.current_date)}</p>
+          <p className="text-lg font-bold text-gray-900" data-testid="current-date">{formatDate(session.current_date)}</p>
           <div className="mt-2">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
               <span>{formatDate(session.start_date)}</span>
@@ -109,7 +109,7 @@ export function PortfolioSummary({ session, isLoading = false }: PortfolioSummar
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">현금</span>
-            <span className="font-medium text-gray-900">{formatCurrency(session.cash_balance)}</span>
+            <span className="font-medium text-gray-900" data-testid="portfolio-cash">{formatCurrency(session.cash_balance)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">주식 평가액</span>
@@ -140,7 +140,7 @@ export function PortfolioSummary({ session, isLoading = false }: PortfolioSummar
             </h4>
             <div className="space-y-2 max-h-32 overflow-y-auto">
               {session.positions.map((pos) => (
-                <div key={pos.id} className="flex items-center justify-between text-xs">
+                <div key={pos.id} className="flex items-center justify-between text-xs" data-testid="position-item">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-gray-900 truncate">{pos.stock_name}</p>
                     <p className="text-gray-500">{pos.quantity}주</p>

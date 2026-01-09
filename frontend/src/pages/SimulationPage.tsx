@@ -84,13 +84,14 @@ export function SimulationPage() {
     setIsLoadingRecommendations(true);
     if (isInitial) {
       setIsInitialRecommendationsLoad(true);
+      await new Promise(resolve => requestAnimationFrame(resolve));
     }
     try {
       const recs = await getRecommendations(id);
       setRecommendations(recs);
 
-      if (recs.length > 0 && !selectedStockCode) {
-        setSelectedStockCode(recs[0].stock_code);
+      if (recs.length > 0) {
+        setSelectedStockCode((current) => current ?? recs[0].stock_code);
       }
 
       if (isInitial) {
@@ -103,7 +104,7 @@ export function SimulationPage() {
       setIsLoadingRecommendations(false);
       setIsInitialRecommendationsLoad(false);
     }
-  }, [selectedStockCode]);
+  }, []);
 
   const loadStockDetail = useCallback(async (id: string, stockCode: string) => {
     setIsLoadingStockDetail(true);
@@ -225,6 +226,9 @@ export function SimulationPage() {
                       </p>
                       <p className="text-sm text-gray-500">
                         {sess.start_date} ~ {sess.end_date} | 현재: {sess.current_date}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        초기자본: {sess.initial_capital?.toLocaleString()}원
                       </p>
                     </div>
                     <Button
@@ -384,7 +388,7 @@ export function SimulationPage() {
       </div>
 
       {((isInitialRecommendationsLoad && isLoadingRecommendations) || isAdvancingTurn) && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center" data-testid="recommendation-loading">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-white text-lg">

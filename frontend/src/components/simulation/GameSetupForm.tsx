@@ -122,6 +122,7 @@ export function GameSetupForm() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <Input
+            name="name"
             label="게임 이름 (선택)"
             placeholder="예: 2024년 상반기 시뮬레이션"
             value={formData.name || ''}
@@ -131,6 +132,7 @@ export function GameSetupForm() {
 
           <div className="grid grid-cols-2 gap-4">
             <Input
+              name="start_date"
               label="시작일"
               type="date"
               value={formData.start_date}
@@ -138,6 +140,7 @@ export function GameSetupForm() {
               required
             />
             <Input
+              name="end_date"
               label="종료일"
               type="date"
               value={formData.end_date}
@@ -148,6 +151,7 @@ export function GameSetupForm() {
 
           <div>
             <Input
+              name="initial_capital"
               label="초기 자본금 (KRW)"
               type="number"
               value={formData.initial_capital}

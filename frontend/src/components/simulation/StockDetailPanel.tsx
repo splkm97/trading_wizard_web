@@ -181,7 +181,7 @@ export function StockDetailPanel({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="stock-detail">
       <Card>
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-start justify-between">

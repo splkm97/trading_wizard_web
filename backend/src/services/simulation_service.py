@@ -17,6 +17,7 @@ from src.models.game_session import (
     SimulatedTrade,
     RecommendationCache,
 )
+from src.models.historical_price import HistoricalPrice
 from src.core.indicators import calculate_all_indicators, calculate_confidence_score
 from src.services.stock_service import stock_service
 from src.wizard.signal_scanner import load_kospi_top100
@@ -117,27 +118,53 @@ class SimulationService:
         self.db.delete(session)
         self.db.commit()
 
-    def _fetch_historical_data(
+    def _fetch_historical_data_from_db(
         self,
         stock_code: str,
         end_date: date,
         days: int = 90,
     ) -> Optional[pd.DataFrame]:
-        """Fetch historical OHLCV data ending at specific date."""
+        """Fetch historical data from local database (fast)."""
+        start_date = end_date - timedelta(days=days + 30)
+        start_str = start_date.isoformat()
+        end_str = end_date.isoformat()
+
+        records = (
+            self.db.query(HistoricalPrice)
+            .filter(
+                HistoricalPrice.stock_code == stock_code,
+                HistoricalPrice.date >= start_str,
+                HistoricalPrice.date <= end_str,
+            )
+            .order_by(HistoricalPrice.date)
+            .all()
+        )
+
+        if len(records) < 30:
+            return None
+
+        data = {
+            "Open": [r.open for r in records],
+            "High": [r.high for r in records],
+            "Low": [r.low for r in records],
+            "Close": [r.close for r in records],
+            "Volume": [r.volume for r in records],
+        }
+        df = pd.DataFrame(data, index=[r.date for r in records])
+        return df
+
+    def _fetch_historical_data_from_yfinance(
+        self,
+        stock_code: str,
+        end_date: date,
+        days: int = 90,
+    ) -> Optional[pd.DataFrame]:
+        """Fetch historical data from yfinance API (slow, fallback)."""
         start_date = end_date - timedelta(days=days + 30)
 
-        ticker = f"{stock_code}.KS"
-        try:
-            df = yf.download(
-                ticker,
-                start=start_date.isoformat(),
-                end=(end_date + timedelta(days=1)).isoformat(),
-                progress=False,
-                auto_adjust=False,
-            )
-
-            if df.empty:
-                ticker = f"{stock_code}.KQ"
+        for suffix in [".KS", ".KQ"]:
+            ticker = f"{stock_code}{suffix}"
+            try:
                 df = yf.download(
                     ticker,
                     start=start_date.isoformat(),
@@ -145,22 +172,38 @@ class SimulationService:
                     progress=False,
                     auto_adjust=False,
                 )
+                if not df.empty:
+                    break
+            except Exception:
+                continue
+        else:
+            return None
 
-            if df.empty or len(df) < 30:
-                return None
+        if df.empty or len(df) < 30:
+            return None
 
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
 
-            df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+        df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+        df.index = pd.to_datetime(df.index).date
+        df = df[df.index <= end_date]
 
-            df.index = pd.to_datetime(df.index).date
-            df = df[df.index <= end_date]
+        return df
 
+    def _fetch_historical_data(
+        self,
+        stock_code: str,
+        end_date: date,
+        days: int = 90,
+        max_retries: int = 3,
+    ) -> Optional[pd.DataFrame]:
+        """Fetch historical data: DB first, yfinance as fallback."""
+        df = self._fetch_historical_data_from_db(stock_code, end_date, days)
+        if df is not None:
             return df
 
-        except Exception:
-            return None
+        return self._fetch_historical_data_from_yfinance(stock_code, end_date, days)
 
     def _get_owned_stock_codes(self, session: GameSession) -> set[str]:
         """Get set of stock codes currently owned in the session."""
@@ -401,7 +444,7 @@ class SimulationService:
 
     def get_price_at_date(self, stock_code: str, target_date: date) -> Optional[float]:
         """Get closing price for a stock at a specific date."""
-        df = self._fetch_historical_data(stock_code, target_date, days=10)
+        df = self._fetch_historical_data(stock_code, target_date, days=60)
         if df is None or len(df) == 0:
             return None
         return float(df.iloc[-1]["Close"])
@@ -873,3 +916,132 @@ class SimulationService:
             "trades": trade_list,
             "daily_values": daily_values,
         }
+
+    def save_as_backtest(
+        self, session: GameSession, name: Optional[str] = None
+    ) -> "BacktestResult":
+        """Convert simulation session to BacktestResult and save it.
+
+        Args:
+            session: The game session to convert
+            name: Optional custom name (defaults to "[시뮬레이션] {session.name}")
+
+        Returns:
+            The created BacktestResult
+        """
+        from src.models.backtest import BacktestResult
+
+        # Generate report data
+        report = self.generate_report(session)
+        export_data = self.export_trades(session)
+
+        # Get remaining positions
+        positions = (
+            self.db.query(SimulatedPosition)
+            .filter(SimulatedPosition.session_id == session.id)
+            .all()
+        )
+
+        positions_data = [
+            {
+                "stock_code": pos.stock_code,
+                "stock_name": pos.stock_name,
+                "quantity": pos.quantity,
+                "entry_price": float(pos.avg_entry_price),
+                "entry_date": pos.entry_date.isoformat(),
+            }
+            for pos in positions
+        ]
+
+        # Build trade_history with reason field
+        trade_history = []
+        for trade_data in export_data["trades"]:
+            reason = ""
+            if trade_data["action"] == "BUY":
+                reason = "manual_buy (simulation)"
+            else:
+                if trade_data["pnl_pct"] is not None:
+                    if trade_data["pnl_pct"] < -4.0:
+                        reason = f"manual_sell ({trade_data['pnl_pct']:.1f}%)"
+                    elif trade_data["pnl_pct"] > 10.0:
+                        reason = f"take_profit ({trade_data['pnl_pct']:.1f}%)"
+                    else:
+                        reason = f"manual_sell ({trade_data['pnl_pct']:.1f}%)"
+                else:
+                    reason = "manual_sell"
+
+            trade_history.append(
+                {
+                    "date": trade_data["date"],
+                    "stock_code": trade_data["stock_code"],
+                    "stock_name": trade_data["stock_name"],
+                    "action": trade_data["action"],
+                    "price": trade_data["price"],
+                    "quantity": trade_data["quantity"],
+                    "reason": reason,
+                    "pnl": trade_data["pnl"],
+                    "pnl_pct": trade_data["pnl_pct"],
+                }
+            )
+
+        # Build daily_values in backtest format
+        daily_values = [{"date": dv[0], "value": dv[1]} for dv in export_data["daily_values"]]
+
+        # Calculate metrics
+        sell_trades = [t for t in trade_history if t["action"] == "SELL"]
+        buy_trades = [t for t in trade_history if t["action"] == "BUY"]
+        winning_trades = [t for t in sell_trades if t["pnl"] and t["pnl"] > 0]
+        losing_trades = [t for t in sell_trades if t["pnl"] and t["pnl"] < 0]
+
+        total_pnl = sum(t["pnl"] or 0 for t in sell_trades)
+        avg_win = (
+            sum(t["pnl"] for t in winning_trades) / len(winning_trades) if winning_trades else 0
+        )
+        avg_loss = sum(t["pnl"] for t in losing_trades) / len(losing_trades) if losing_trades else 0
+
+        # Build result_json (backtest format)
+        result_json = {
+            "backtest_metrics": {
+                "final_value": report["current_value"],
+                "total_return_pct": report["total_return_pct"],
+                "total_trades": len(sell_trades),
+                "buy_trades": len(buy_trades),
+                "sell_trades": len(sell_trades),
+                "winning_trades": len(winning_trades),
+                "losing_trades": len(losing_trades),
+                "win_rate": report["win_rate_pct"],
+                "total_pnl": total_pnl,
+                "avg_win": avg_win,
+                "avg_loss": avg_loss,
+                "max_drawdown": report["max_drawdown_pct"],
+            },
+            "positions": positions_data,
+            "trade_history": trade_history,
+            "daily_values": daily_values,
+        }
+
+        # Determine name
+        backtest_name = name or f"[시뮬레이션] {session.name or session.id[:8]}"
+
+        # Create BacktestResult
+        backtest = BacktestResult(
+            user_id=session.user_id,
+            name=backtest_name,
+            start_date=session.start_date,
+            end_date=session.current_date,  # Use current_date as actual end
+            stock_list_name="simulation_manual",
+            initial_capital=session.initial_capital,
+            final_value=Decimal(str(report["current_value"])),
+            total_return_pct=Decimal(str(report["total_return_pct"])),
+            max_drawdown_pct=Decimal(str(report["max_drawdown_pct"])),
+            total_trades=len(sell_trades),
+            winning_trades=len(winning_trades),
+            win_rate_pct=Decimal(str(report["win_rate_pct"])),
+            result_json=result_json,
+        )
+
+        self.db.add(backtest)
+        self.db.commit()
+        self.db.refresh(backtest)
+
+        return backtest
