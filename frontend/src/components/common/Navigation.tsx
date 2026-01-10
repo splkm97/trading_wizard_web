@@ -5,6 +5,7 @@ import { Button } from './Button';
 const NAV_ITEMS = [
   { path: '/dashboard', label: '대시보드' },
   { path: '/trade', label: '거래 입력' },
+  { path: '/contrarian', label: 'MACD/RSI 역추세' },
   { path: '/simulation', label: '시뮬레이션' },
   { path: '/history', label: '거래 이력' },
   { path: '/backtest', label: '백테스트' },
@@ -50,6 +51,18 @@ export function Navigation() {
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
+            {/* Help Icon */}
+            <Link
+              to="/guide"
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                location.pathname === '/guide'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+              }`}
+              title="시작하기 가이드"
+            >
+              ?
+            </Link>
             <span className="text-sm text-gray-500 hidden sm:block">
               {user?.nickname || user?.fingerprint?.slice(0, 8) + '...'}
             </span>
