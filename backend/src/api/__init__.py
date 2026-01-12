@@ -14,6 +14,7 @@ from src.api import (
     settings,
     stock_lists,
     simulation,
+    contrarian,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -29,3 +30,4 @@ api_router.include_router(backtest.router)
 api_router.include_router(settings.router)
 api_router.include_router(stock_lists.router)
 api_router.include_router(simulation.router)
+api_router.include_router(contrarian.router)

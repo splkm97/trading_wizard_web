@@ -4,10 +4,13 @@ import { Button } from '../common/Button';
 import { Input } from '../common/Input';
 import { UserSettings, ConstitutionWarning } from '../../types';
 
+type SettingsTab = 'risk' | 'bollinger' | 'contrarian' | 'advanced';
+
 interface SettingsFormProps {
   initialSettings: UserSettings;
   onSave: (settings: UserSettings) => Promise<ConstitutionWarning[]>;
   isLoading?: boolean;
+  initialTab?: SettingsTab;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -27,18 +30,27 @@ const DEFAULT_SETTINGS: UserSettings = {
   band_touch_tolerance: 0.001,
   trading_days_per_year: 252,
   days_per_year: 365,
+  // MACD/RSI Contrarian Strategy Settings
+  macd_rsi_rsi_period: 14,
+  macd_rsi_rsi_threshold: 30,
+  macd_rsi_macd_fast_period: 12,
+  macd_rsi_macd_slow_period: 26,
+  macd_rsi_macd_signal_period: 9,
+  macd_rsi_confidence_threshold: 40,
 };
 
 export function SettingsForm({
   initialSettings,
   onSave,
   isLoading = false,
+  initialTab = 'risk',
 }: SettingsFormProps) {
   const [settings, setSettings] = useState<UserSettings>(initialSettings);
   const [warnings, setWarnings] = useState<ConstitutionWarning[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'risk' | 'bollinger' | 'advanced'>('risk');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setSettings(initialSettings);
@@ -75,6 +87,18 @@ export function SettingsForm({
     setWarnings(newWarnings);
   }, [settings]);
 
+  // Validate MACD fast period < slow period
+  useEffect(() => {
+    const errors: Record<string, string> = {};
+
+    if (settings.macd_rsi_macd_fast_period >= settings.macd_rsi_macd_slow_period) {
+      errors.macd_rsi_macd_fast_period = 'Fast 기간은 Slow 기간보다 작아야 합니다';
+      errors.macd_rsi_macd_slow_period = 'Slow 기간은 Fast 기간보다 커야 합니다';
+    }
+
+    setValidationErrors(errors);
+  }, [settings.macd_rsi_macd_fast_period, settings.macd_rsi_macd_slow_period]);
+
   const handleChange = (field: keyof UserSettings, value: number | boolean) => {
     setSettings((prev) => ({ ...prev, [field]: value }));
     setSuccessMessage(null);
@@ -82,6 +106,12 @@ export function SettingsForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check for validation errors before submitting
+    if (Object.keys(validationErrors).length > 0) {
+      return;
+    }
+
     setIsSaving(true);
     setSuccessMessage(null);
 
@@ -104,6 +134,7 @@ export function SettingsForm({
   const tabs = [
     { id: 'risk' as const, label: '리스크 관리' },
     { id: 'bollinger' as const, label: '볼린저 밴드' },
+    { id: 'contrarian' as const, label: 'MACD/RSI' },
     { id: 'advanced' as const, label: '고급 설정' },
   ];
 
@@ -327,6 +358,101 @@ export function SettingsForm({
           </div>
         )}
 
+        {/* MACD/RSI Contrarian Tab */}
+        {activeTab === 'contrarian' && (
+          <div className="space-y-6">
+            <h3 className="text-md font-medium text-gray-800 border-b pb-2">RSI 설정</h3>
+
+            <div>
+              <Input
+                label="RSI 기간"
+                type="number"
+                value={settings.macd_rsi_rsi_period}
+                onChange={(e) => handleChange('macd_rsi_rsi_period', Number(e.target.value))}
+                min={2}
+                max={50}
+                helperText="RSI 계산 기간 (기본: 14일)"
+              />
+            </div>
+
+            <div>
+              <Input
+                label="RSI 과매도 임계값"
+                type="number"
+                value={settings.macd_rsi_rsi_threshold}
+                onChange={(e) => handleChange('macd_rsi_rsi_threshold', Number(e.target.value))}
+                min={10}
+                max={50}
+                helperText="RSI가 이 값 이하일 때 과매도 (기본: 30)"
+              />
+            </div>
+
+            <h3 className="text-md font-medium text-gray-800 border-b pb-2 pt-4">MACD 설정</h3>
+
+            <div>
+              <Input
+                label="MACD Fast 기간"
+                type="number"
+                value={settings.macd_rsi_macd_fast_period}
+                onChange={(e) => handleChange('macd_rsi_macd_fast_period', Number(e.target.value))}
+                min={2}
+                max={50}
+                helperText="단기 이동평균 기간 (기본: 12일)"
+                error={validationErrors.macd_rsi_macd_fast_period}
+              />
+            </div>
+
+            <div>
+              <Input
+                label="MACD Slow 기간"
+                type="number"
+                value={settings.macd_rsi_macd_slow_period}
+                onChange={(e) => handleChange('macd_rsi_macd_slow_period', Number(e.target.value))}
+                min={5}
+                max={100}
+                helperText="장기 이동평균 기간 (기본: 26일)"
+                error={validationErrors.macd_rsi_macd_slow_period}
+              />
+            </div>
+
+            <div>
+              <Input
+                label="MACD Signal 기간"
+                type="number"
+                value={settings.macd_rsi_macd_signal_period}
+                onChange={(e) => handleChange('macd_rsi_macd_signal_period', Number(e.target.value))}
+                min={2}
+                max={50}
+                helperText="시그널선 이동평균 기간 (기본: 9일)"
+              />
+            </div>
+
+            <h3 className="text-md font-medium text-gray-800 border-b pb-2 pt-4">신뢰도 설정</h3>
+
+            <div>
+              <Input
+                label="신뢰도 임계값"
+                type="number"
+                value={settings.macd_rsi_confidence_threshold}
+                onChange={(e) => handleChange('macd_rsi_confidence_threshold', Number(e.target.value))}
+                min={0}
+                max={100}
+                helperText="역추세 신호 최소 신뢰도 점수 (기본: 40)"
+              />
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mt-4">
+              <h4 className="text-sm font-medium text-purple-800 mb-2">역추세 전략 설명</h4>
+              <ul className="text-xs text-purple-700 space-y-1">
+                <li>• RSI 과매도 (RSI ≤ 임계값) 조건 감지</li>
+                <li>• MACD 골든크로스 (MACD선이 Signal선 상향 돌파)</li>
+                <li>• 두 조건을 모두 만족하면 매수 신호 생성</li>
+                <li>• 신뢰도 점수가 임계값 이상인 신호만 표시</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
         {/* Advanced Tab */}
         {activeTab === 'advanced' && (
           <div className="space-y-6">
@@ -390,7 +516,7 @@ export function SettingsForm({
           <Button
             type="submit"
             isLoading={isSaving || isLoading}
-            disabled={isSaving || isLoading}
+            disabled={isSaving || isLoading || Object.keys(validationErrors).length > 0}
             className="flex-1"
           >
             저장

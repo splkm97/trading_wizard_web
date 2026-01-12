@@ -1,11 +1,17 @@
 """
 Stock universe scanner for daily trading signals.
 Fetches data from yfinance and calculates technical indicators.
+
+Optimized for PostgreSQL-first data access strategy:
+1. Memory cache (5min TTL)
+2. PostgreSQL DB (permanent storage)
+3. yfinance API (fallback)
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import math
 import warnings
 from dataclasses import dataclass
@@ -15,8 +21,11 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 import yfinance as yf
+from sqlalchemy import create_engine, text
 
 warnings.filterwarnings("ignore")
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -26,7 +35,7 @@ class StockSignal:
     stock_code: str
     stock_name: str
     signal_type: str  # "BUY", "SELL", "HOLD"
-    confidence_score: int
+    confidence_score: float  # Changed from int to float for precision (3 decimal places)
     current_price: float
     reason: str
     indicators: Dict[str, float]
@@ -98,8 +107,70 @@ def load_kospi_top100(filepath: str = "kospi_top100.txt") -> List[str]:
     )
 
 
+def fetch_stock_data_from_db(
+    stock_code: str, days: int = 60, engine=None
+) -> Optional[pd.DataFrame]:
+    """
+    Fetch OHLCV data from PostgreSQL database (fast).
+
+    Args:
+        stock_code: 6-digit stock code
+        days: Number of days of history
+        engine: SQLAlchemy engine (creates one if not provided)
+
+    Returns:
+        DataFrame with OHLCV data or None
+    """
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days + 30)
+
+    query = text(
+        """
+        SELECT date, open, high, low, close, volume
+        FROM historical_prices
+        WHERE stock_code = :code
+          AND date >= :start_date
+          AND date <= :end_date
+        ORDER BY date ASC
+    """
+    )
+
+    try:
+        # Create engine if not provided
+        if engine is None:
+            try:
+                from src.core.config import settings
+
+                engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+            except Exception:
+                return None
+
+        with engine.connect() as conn:
+            df = pd.read_sql_query(
+                query,
+                conn,
+                params={
+                    "code": stock_code,
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                },
+                index_col="date",
+            )
+
+        if df.empty or len(df) < 30:
+            return None
+
+        # Rename columns to match expected format
+        df.columns = ["Open", "High", "Low", "Close", "Volume"]
+        return df
+
+    except Exception as e:
+        logger.debug(f"DB fetch failed for {stock_code}: {e}")
+        return None
+
+
 def fetch_stock_data(stock_code: str, days: int = 60) -> Optional[pd.DataFrame]:
-    """Fetch OHLCV data from Yahoo Finance."""
+    """Fetch OHLCV data from Yahoo Finance (fallback)."""
     end_date = date.today()
     start_date = end_date - timedelta(days=days + 30)
 
@@ -223,6 +294,105 @@ def calculate_confidence_score(
     return score
 
 
+def calculate_contrarian_confidence(rsi: float, macd_histogram: float, macd_signal: float) -> float:
+    """
+    Calculate contrarian signal confidence score (0-100 points).
+
+    Scoring (per research.md):
+        - RSI ≤ 20: Base 80 points (deeply oversold)
+        - RSI 20-25: Base 60 points (oversold)
+        - RSI 25-30: Base 40 points (mildly oversold)
+        - MACD histogram bonus: 0-20 points based on histogram strength relative to signal
+    """
+    # Base score from RSI tier
+    if rsi <= 20:
+        base = 80.0
+    elif rsi <= 25:
+        base = 60.0
+    else:  # 25 < rsi <= 30
+        base = 40.0
+
+    # MACD histogram bonus (0-20 points)
+    if macd_histogram > 0 and macd_signal != 0:
+        # Normalize histogram relative to signal strength
+        ratio = min(abs(macd_histogram) / abs(macd_signal), 1.0)
+        bonus = 20.0 * ratio
+    else:
+        bonus = 0.0
+
+    return min(100.0, base + bonus)
+
+
+def format_contrarian_reason_detail(
+    rsi: float,
+    macd: float,  # noqa: ARG001 - Reserved for future use
+    macd_signal: float,
+    macd_histogram: float,
+) -> str:
+    """
+    Generate detailed Korean explanation of contrarian signal.
+
+    Args:
+        rsi: RSI value
+        macd: MACD line value
+        macd_signal: MACD signal line value
+        macd_histogram: MACD histogram value
+
+    Returns:
+        Detailed reason text in Korean
+    """
+    # Determine RSI oversold level
+    if rsi <= 20:
+        rsi_desc = f"RSI {rsi:.1f}로 심각한 과매도 상태입니다"
+    elif rsi <= 25:
+        rsi_desc = f"RSI {rsi:.1f}로 강한 과매도 상태입니다"
+    else:
+        rsi_desc = f"RSI {rsi:.1f}로 과매도 상태입니다"
+
+    # MACD description
+    macd_strength = "강한" if macd_histogram > abs(macd_signal * 0.5) else ""
+    macd_desc = f"MACD가 시그널선을 {macd_strength}상향 돌파했습니다"
+
+    # Combine
+    return f"{rsi_desc}. {macd_desc}. 기술적 반등 가능성이 높습니다."
+
+
+def detect_macd_golden_cross(df: pd.DataFrame) -> bool:
+    """
+    Detect if MACD golden cross occurred on most recent trading day.
+
+    Golden Cross Definition:
+        - Previous day: MACD line < Signal line
+        - Current day: MACD line >= Signal line
+
+    Args:
+        df: DataFrame with MACD and MACD_Signal columns
+
+    Returns:
+        True if golden cross occurred on most recent day
+    """
+    if len(df) < 2:
+        return False
+
+    current = df.iloc[-1]
+    previous = df.iloc[-2]
+
+    # Check for NaN values
+    if pd.isna(current["MACD"]) or pd.isna(current["MACD_Signal"]):
+        return False
+    if pd.isna(previous["MACD"]) or pd.isna(previous["MACD_Signal"]):
+        return False
+
+    prev_macd = float(previous["MACD"])
+    prev_signal = float(previous["MACD_Signal"])
+    curr_macd = float(current["MACD"])
+    curr_signal = float(current["MACD_Signal"])
+
+    # Previous day: MACD below signal
+    # Current day: MACD at or above signal
+    return prev_macd < prev_signal and curr_macd >= curr_signal
+
+
 class SignalScanner:
     """Scans stock universe for trading signals."""
 
@@ -273,28 +443,38 @@ class SignalScanner:
         self._cache: Dict[str, pd.DataFrame] = {}
 
     def _load_cache(self) -> None:
-        """Load cache from disk if available."""
+        """Load cache from disk if available (30 min TTL)."""
         if not self._cache and self.use_cache:
             try:
                 from src.wizard.data_cache import load_cache, is_cache_valid
 
-                # Use cache if valid within 7 days (avoid yfinance rate limits)
-                if is_cache_valid(max_age_hours=168):
-                    self._cache = load_cache()
+                # Use cache if valid within 30 minutes
+                if is_cache_valid(max_age_hours=0.5):
+                    self._cache = load_cache(max_age_hours=0.5, auto_refresh=False)
                 else:
-                    # Try loading anyway - stale data is better than no data
-                    self._cache = load_cache()
+                    # Cache expired - don't load stale data, rely on DB
+                    logger.debug("Cache expired (>30min), using DB as primary source")
             except Exception:
                 pass
 
     def _get_stock_data(self, stock_code: str) -> Optional[pd.DataFrame]:
-        """Get stock data from cache or fetch from yfinance."""
-        self._load_cache()
+        """
+        Get stock data with PostgreSQL-first caching strategy.
 
-        # Try cache first - but recalculate indicators with current settings
-        if stock_code in self._cache:
-            df = self._cache[stock_code].copy()
-            # Recalculate indicators with user settings
+        Priority:
+        1. PostgreSQL DB (primary source, most up-to-date)
+        2. Memory/disk cache (fallback if DB unavailable)
+        3. yfinance API (last resort)
+
+        Args:
+            stock_code: 6-digit stock code
+
+        Returns:
+            DataFrame with indicators or None
+        """
+        # L1: PostgreSQL DB (primary source - always has latest data)
+        df = fetch_stock_data_from_db(stock_code)
+        if df is not None and len(df) >= 30:
             df = calculate_indicators(
                 df,
                 bollinger_period=self.bollinger_period,
@@ -302,9 +482,26 @@ class SignalScanner:
                 squeeze_threshold_pct=self.squeeze_threshold_pct,
                 squeeze_lookback_days=self.squeeze_lookback_days,
             )
+            # Update memory cache
+            self._cache[stock_code] = df.copy()
             return df
 
-        # Fallback to yfinance
+        # L2: Memory/disk cache (fallback if DB fails)
+        self._load_cache()
+        if stock_code in self._cache:
+            cached_df = self._cache[stock_code].copy()
+            # Recalculate indicators with user settings
+            cached_df = calculate_indicators(
+                cached_df,
+                bollinger_period=self.bollinger_period,
+                bollinger_std_dev=self.bollinger_std_dev,
+                squeeze_threshold_pct=self.squeeze_threshold_pct,
+                squeeze_lookback_days=self.squeeze_lookback_days,
+            )
+            logger.debug(f"{stock_code}: Using cache (DB unavailable)")
+            return cached_df
+
+        # L3: yfinance API (slow, 1-5s, last resort)
         df = fetch_stock_data(stock_code)
         if df is not None and len(df) >= 30:
             df = calculate_indicators(
@@ -314,7 +511,10 @@ class SignalScanner:
                 squeeze_threshold_pct=self.squeeze_threshold_pct,
                 squeeze_lookback_days=self.squeeze_lookback_days,
             )
+            # Update memory cache
+            self._cache[stock_code] = df.copy()
             return df
+
         return None
 
     def scan_for_buy_signals(
@@ -545,6 +745,106 @@ class SignalScanner:
                 )
 
         return signals
+
+    def scan_for_contrarian_signals(
+        self,
+        stock_codes: List[str],
+        rsi_threshold: float = 30.0,
+        confidence_threshold: float = 40.0,
+        max_results: int = 10,
+        target_date: Optional[date] = None,
+    ) -> List[StockSignal]:
+        """
+        Scan for MACD/RSI contrarian BUY signals.
+
+        Signal Criteria:
+            1. RSI(14) <= rsi_threshold (oversold condition)
+            2. MACD golden cross on most recent day
+            3. Confidence score >= confidence_threshold
+
+        Args:
+            stock_codes: List of stock codes to scan
+            rsi_threshold: Maximum RSI to consider (default 30)
+            confidence_threshold: Minimum confidence score (default 40)
+            max_results: Maximum number of signals to return
+            target_date: Date to scan for signals (defaults to latest available)
+
+        Returns:
+            List of StockSignal with contrarian BUY signals
+        """
+        signals = []
+
+        for stock_code in stock_codes:
+            df = self._get_stock_data(stock_code)
+            if df is None or len(df) < 35:
+                continue
+
+            # If target_date is specified, find the row for that date
+            if target_date is not None:
+                # Filter to data up to and including target_date
+                df_filtered = df[df.index.date <= target_date]
+                if len(df_filtered) < 35:
+                    continue
+                latest = df_filtered.iloc[-1]
+                # Use filtered dataframe for golden cross detection
+                df_for_cross = df_filtered
+            else:
+                latest = df.iloc[-1]
+                df_for_cross = df
+
+            # Check for NaN in required indicators
+            if pd.isna(latest["RSI"]) or pd.isna(latest["MACD"]) or pd.isna(latest["MACD_Signal"]):
+                continue
+
+            rsi = float(latest["RSI"])
+            macd = float(latest["MACD"])
+            macd_signal = float(latest["MACD_Signal"])
+            macd_histogram = float(latest["MACD_Histogram"])
+
+            # Condition 1: RSI <= threshold (oversold)
+            if rsi > rsi_threshold:
+                continue
+
+            # Condition 2: MACD golden cross on most recent day
+            if not detect_macd_golden_cross(df_for_cross):
+                continue
+
+            # Calculate confidence score
+            confidence = calculate_contrarian_confidence(rsi, macd_histogram, macd_signal)
+
+            # Condition 3: Confidence >= threshold
+            if confidence < confidence_threshold:
+                continue
+
+            # Generate signal with detailed reason
+            stock_name = get_stock_name(stock_code)
+            reason_detail = format_contrarian_reason_detail(
+                rsi=rsi,
+                macd=macd,
+                macd_signal=macd_signal,
+                macd_histogram=macd_histogram,
+            )
+            signals.append(
+                StockSignal(
+                    stock_code=stock_code,
+                    stock_name=stock_name,
+                    signal_type="BUY",
+                    confidence_score=confidence,
+                    current_price=float(latest["Close"]),
+                    reason="contrarian_oversold_reversal",
+                    indicators={
+                        "rsi": rsi,
+                        "macd": macd,
+                        "macd_signal": macd_signal,
+                        "macd_histogram": macd_histogram,
+                        "reason_detail": reason_detail,
+                    },
+                )
+            )
+
+        # Sort by confidence and return top results
+        signals.sort(key=lambda x: x.confidence_score, reverse=True)
+        return signals[:max_results]
 
     def get_current_prices(self, stock_codes: List[str]) -> Dict[str, float]:
         """Get current prices for a list of stocks."""

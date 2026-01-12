@@ -38,6 +38,14 @@ class UserSettings(BaseModel):
     trading_days_per_year = Column(Integer, nullable=False, default=252)
     days_per_year = Column(Integer, nullable=False, default=365)
 
+    # MACD/RSI Contrarian Strategy Settings
+    macd_rsi_rsi_period = Column(Integer, nullable=False, default=14)
+    macd_rsi_rsi_threshold = Column(Numeric(4, 1), nullable=False, default=30.0)
+    macd_rsi_macd_fast_period = Column(Integer, nullable=False, default=12)
+    macd_rsi_macd_slow_period = Column(Integer, nullable=False, default=26)
+    macd_rsi_macd_signal_period = Column(Integer, nullable=False, default=9)
+    macd_rsi_confidence_threshold = Column(Numeric(5, 1), nullable=False, default=40.0)
+
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="settings")

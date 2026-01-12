@@ -145,6 +145,14 @@ export interface UserSettings {
   // Metrics Configuration
   trading_days_per_year: number;
   days_per_year: number;
+
+  // MACD/RSI Contrarian Strategy Settings
+  macd_rsi_rsi_period: number;
+  macd_rsi_rsi_threshold: number;
+  macd_rsi_macd_fast_period: number;
+  macd_rsi_macd_slow_period: number;
+  macd_rsi_macd_signal_period: number;
+  macd_rsi_confidence_threshold: number;
 }
 
 // Pagination
@@ -165,4 +173,69 @@ export interface ConstitutionWarning {
   field: string;
   message: string;
   recommended_value: number;
+}
+
+// Contrarian Strategy Types
+export interface ContrarianIndicators {
+  rsi: number;
+  macd: number;
+  macd_signal: number;
+  macd_histogram: number;
+  reason_detail?: string;
+}
+
+export interface ContrarianSignal {
+  stock_code: string;
+  stock_name: string;
+  signal_type: 'BUY';
+  confidence_score: number;
+  current_price: number;
+  reason: string;
+  indicators: ContrarianIndicators;
+}
+
+export interface AppliedContrarianSettings {
+  rsi_period: number;
+  rsi_threshold: number;
+  macd_fast_period: number;
+  macd_slow_period: number;
+  macd_signal_period: number;
+  confidence_threshold: number;
+}
+
+export interface ContrarianSignalsResponse {
+  signals: ContrarianSignal[];
+  scanned_count: number;
+  signal_count: number;
+  applied_settings: AppliedContrarianSettings;
+  scan_date: string; // YYYY-MM-DD format
+}
+
+export interface SingleContrarianSignalResponse {
+  signal: ContrarianSignal | null;
+  applied_settings: AppliedContrarianSettings;
+}
+
+// Applied Settings (from recommendations API)
+export interface AppliedSettings {
+  // Risk Management
+  stop_loss_pct: number;
+  max_positions: number;
+  max_position_pct: number;
+  confidence_threshold: number;
+
+  // Take Profit
+  take_profit_pct: number;
+  take_profit_ratio: number;
+
+  // Sell Conditions
+  sell_on_middle_band: boolean;
+
+  // Bollinger Band
+  bollinger_period: number;
+  bollinger_std_dev: number;
+
+  // Squeeze Detection
+  squeeze_threshold_pct: number;
+  squeeze_lookback_days: number;
 }

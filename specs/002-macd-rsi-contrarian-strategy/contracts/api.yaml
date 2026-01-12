@@ -1,0 +1,271 @@
+openapi: 3.0.3
+info:
+  title: Trading Wizard - Contrarian Strategy API
+  description: API endpoints for MACD/RSI contrarian signal detection strategy
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: API base path
+
+paths:
+  /contrarian/signals:
+    get:
+      summary: Get contrarian buy signals
+      description: |
+        Scans KOSPI Top 100 stocks for contrarian buy signals based on:
+        - RSI ≤ threshold (default 30) - oversold condition
+        - MACD golden cross on most recent trading day
+
+        Returns signals sorted by confidence score (descending).
+      operationId: getContrarianSignals
+      tags:
+        - Contrarian
+      parameters:
+        - name: max_results
+          in: query
+          description: Maximum number of signals to return
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+        - name: confidence_threshold
+          in: query
+          description: Override minimum confidence score (uses user settings if not provided)
+          required: false
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 100
+      responses:
+        '200':
+          description: Successful response with contrarian signals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContrarianSignalsResponse'
+        '401':
+          description: Unauthorized - missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /contrarian/signal/{stock_code}:
+    get:
+      summary: Get contrarian signal for a single stock
+      description: |
+        Analyzes a specific stock for contrarian buy signal conditions.
+        Returns signal if conditions are met, otherwise returns null signal.
+      operationId: getContrarianSignalForStock
+      tags:
+        - Contrarian
+      parameters:
+        - name: stock_code
+          in: path
+          description: 6-digit Korean stock code
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{6}$'
+      responses:
+        '200':
+          description: Successful response with signal or null
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleSignalResponse'
+        '400':
+          description: Invalid stock code format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Stock not found or insufficient data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    ContrarianSignal:
+      type: object
+      required:
+        - stock_code
+        - stock_name
+        - signal_type
+        - confidence_score
+        - current_price
+        - indicators
+      properties:
+        stock_code:
+          type: string
+          description: 6-digit Korean stock code
+          example: "005930"
+        stock_name:
+          type: string
+          description: Korean stock name
+          example: "삼성전자"
+        signal_type:
+          type: string
+          enum: [BUY]
+          description: Signal type (always BUY for contrarian signals)
+        confidence_score:
+          type: number
+          format: float
+          description: Confidence score (0-100) based on RSI tier and MACD strength
+          minimum: 0
+          maximum: 100
+          example: 85.5
+        current_price:
+          type: number
+          format: float
+          description: Latest closing price in KRW
+          example: 72500.0
+        reason:
+          type: string
+          description: Signal reason code
+          example: "contrarian_rsi_macd_golden_cross"
+        indicators:
+          $ref: '#/components/schemas/ContrarianIndicators'
+
+    ContrarianIndicators:
+      type: object
+      required:
+        - rsi
+        - macd
+        - macd_signal
+        - macd_histogram
+      properties:
+        rsi:
+          type: number
+          format: float
+          description: RSI(14) value
+          minimum: 0
+          maximum: 100
+          example: 18.5
+        macd:
+          type: number
+          format: float
+          description: MACD line value
+          example: -450.25
+        macd_signal:
+          type: number
+          format: float
+          description: Signal line value
+          example: -520.80
+        macd_histogram:
+          type: number
+          format: float
+          description: MACD histogram (MACD - Signal)
+          example: 70.55
+
+    AppliedContrarianSettings:
+      type: object
+      description: Settings snapshot used for this scan
+      required:
+        - rsi_period
+        - rsi_threshold
+        - macd_fast_period
+        - macd_slow_period
+        - macd_signal_period
+        - confidence_threshold
+      properties:
+        rsi_period:
+          type: integer
+          description: RSI calculation period
+          example: 14
+        rsi_threshold:
+          type: number
+          format: float
+          description: RSI oversold threshold
+          example: 30.0
+        macd_fast_period:
+          type: integer
+          description: MACD fast EMA period
+          example: 12
+        macd_slow_period:
+          type: integer
+          description: MACD slow EMA period
+          example: 26
+        macd_signal_period:
+          type: integer
+          description: MACD signal line period
+          example: 9
+        confidence_threshold:
+          type: number
+          format: float
+          description: Minimum confidence threshold applied
+          example: 40.0
+
+    ContrarianSignalsResponse:
+      type: object
+      required:
+        - signals
+        - scanned_count
+        - signal_count
+        - applied_settings
+      properties:
+        signals:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContrarianSignal'
+          description: List of contrarian signals sorted by confidence (descending)
+        scanned_count:
+          type: integer
+          description: Number of stocks scanned
+          example: 100
+        signal_count:
+          type: integer
+          description: Number of signals meeting criteria
+          example: 3
+        applied_settings:
+          $ref: '#/components/schemas/AppliedContrarianSettings'
+
+    SingleSignalResponse:
+      type: object
+      required:
+        - signal
+        - applied_settings
+      properties:
+        signal:
+          oneOf:
+            - $ref: '#/components/schemas/ContrarianSignal'
+            - type: 'null'
+          description: Signal if conditions met, null otherwise
+        applied_settings:
+          $ref: '#/components/schemas/AppliedContrarianSettings'
+
+    Error:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message
+          example: "Stock not found or insufficient price history"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Contrarian
+    description: MACD/RSI contrarian signal detection endpoints

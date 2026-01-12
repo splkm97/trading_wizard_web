@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 import pandas as pd
 import yfinance as yf
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.models.game_session import (
@@ -17,13 +19,11 @@ from src.models.game_session import (
     SimulatedTrade,
     RecommendationCache,
 )
-from src.models.historical_price import HistoricalPrice
 from src.core.indicators import calculate_all_indicators, calculate_confidence_score
 from src.services.stock_service import stock_service
 from src.wizard.signal_scanner import load_kospi_top100
 
-if TYPE_CHECKING:
-    from src.models.user import User
+logger = logging.getLogger(__name__)
 
 
 class InsufficientFundsError(Exception):
@@ -124,34 +124,66 @@ class SimulationService:
         end_date: date,
         days: int = 90,
     ) -> Optional[pd.DataFrame]:
-        """Fetch historical data from local database (fast)."""
-        start_date = end_date - timedelta(days=days + 30)
-        start_str = start_date.isoformat()
-        end_str = end_date.isoformat()
+        """
+        Fetch historical data from local database using optimized raw SQL.
 
-        records = (
-            self.db.query(HistoricalPrice)
-            .filter(
-                HistoricalPrice.stock_code == stock_code,
-                HistoricalPrice.date >= start_str,
-                HistoricalPrice.date <= end_str,
-            )
-            .order_by(HistoricalPrice.date)
-            .all()
+        Performance improvements:
+        1. Raw SQL bypasses ORM overhead
+        2. pandas.read_sql_query creates DataFrame directly
+        3. Index-optimized query (stock_code, date)
+        4. No unnecessary data conversion steps
+
+        Args:
+            stock_code: 6-digit stock code
+            end_date: Query end date
+            days: Number of days of history to fetch
+
+        Returns:
+            DataFrame with columns: [Open, High, Low, Close, Volume]
+        """
+        start_date = end_date - timedelta(days=days + 30)
+
+        # Raw SQL query (bypasses ORM)
+        query = text(
+            """
+            SELECT date, open, high, low, close, volume
+            FROM historical_prices
+            WHERE stock_code = :code
+              AND date >= :start_date
+              AND date <= :end_date
+            ORDER BY date ASC
+        """
         )
 
-        if len(records) < 30:
-            return None
+        try:
+            # Use raw connection for pandas.read_sql_query
+            connection = self.db.get_bind().connect()
+            try:
+                df = pd.read_sql_query(
+                    query,
+                    connection,
+                    params={
+                        "code": stock_code,
+                        "start_date": start_date.isoformat(),
+                        "end_date": end_date.isoformat(),
+                    },
+                    index_col="date",
+                )
+            finally:
+                connection.close()
 
-        data = {
-            "Open": [r.open for r in records],
-            "High": [r.high for r in records],
-            "Low": [r.low for r in records],
-            "Close": [r.close for r in records],
-            "Volume": [r.volume for r in records],
-        }
-        df = pd.DataFrame(data, index=[r.date for r in records])
-        return df
+            if len(df) < 30:
+                logger.debug(f"Insufficient data for {stock_code}: {len(df)} records")
+                return None
+
+            # Rename columns to match expected format
+            df.columns = ["Open", "High", "Low", "Close", "Volume"]
+
+            return df
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch historical data for {stock_code}: {e}")
+            return None
 
     def _fetch_historical_data_from_yfinance(
         self,

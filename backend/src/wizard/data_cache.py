@@ -182,9 +182,13 @@ def refresh_cache(stock_codes: Optional[List[str]] = None) -> Dict[str, pd.DataF
     return data
 
 
-def load_cache() -> Dict[str, pd.DataFrame]:
+def load_cache(max_age_hours: int = 24, auto_refresh: bool = True) -> Dict[str, pd.DataFrame]:
     """
     Load cached data from disk or memory.
+
+    Args:
+        max_age_hours: Maximum cache age in hours before refresh
+        auto_refresh: If True, automatically refresh stale cache
 
     Returns:
         Dict of stock_code -> DataFrame with indicators
@@ -197,6 +201,25 @@ def load_cache() -> Dict[str, pd.DataFrame]:
             age = (datetime.now() - _cache_timestamp).total_seconds()
             if age < 300:  # 5 minutes
                 return _memory_cache
+
+        # Check cache validity before loading
+        if not is_cache_valid(max_age_hours):
+            cache_info = get_cache_info()
+            if cache_info:
+                print(f"Cache is stale (created: {cache_info['timestamp']})")
+            else:
+                print("No cache found")
+
+            if auto_refresh:
+                print("Auto-refreshing cache...")
+                # Release lock before refresh (refresh has its own lock)
+                _cache_lock.release()
+                try:
+                    return refresh_cache()
+                finally:
+                    _cache_lock.acquire()
+            else:
+                print("WARNING: Using stale cache data!")
 
         # Try loading from disk
         if CACHE_FILE.exists():

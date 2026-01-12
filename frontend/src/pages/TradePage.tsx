@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { TradeInputForm, RecommendationsPanel } from '../components/trade';
 import { Button } from '../components/common';
 
@@ -87,6 +87,45 @@ export default function TradePage() {
                 <li>RSI, MACD, 거래량으로 신뢰도 산정</li>
                 <li>포지션당 최대 10% 자금 배분</li>
               </ul>
+            </div>
+
+            {/* Strategy Switcher */}
+            <div className="mt-4 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">다른 전략 보기:</span>
+                <Link
+                  to="/contrarian"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                    />
+                  </svg>
+                  MACD/RSI 역추세 전략
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
         </div>

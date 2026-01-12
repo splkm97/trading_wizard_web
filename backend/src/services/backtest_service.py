@@ -8,21 +8,21 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.core.indicators import calculate_all_indicators, calculate_confidence_score
+from src.core.logging import logger
 from src.models.backtest import BacktestResult
 from src.models.user_settings import UserSettings
 from src.services.stock_service import stock_service
-from src.core.logging import logger
 
 
 @dataclass
@@ -48,8 +48,8 @@ class Trade:
     price: float
     quantity: int
     reason: str
-    pnl: Optional[float] = None
-    pnl_pct: Optional[float] = None
+    pnl: float | None = None
+    pnl_pct: float | None = None
 
 
 @dataclass
@@ -148,7 +148,7 @@ class BacktestService:
         end_date: date,
         stock_list_name: str,
         initial_capital: float = 1_000_000,
-        name: Optional[str] = None,
+        name: str | None = None,
         progress_callback=None,
     ) -> BacktestResult:
         """
@@ -235,10 +235,10 @@ class BacktestService:
         First checks if stock_list_name is a custom list ID or name,
         then falls back to file-based lists.
         """
-        from src.models.stock_list import StockList
-
         # Try to load from database first (by ID or name)
         from sqlalchemy import or_
+
+        from src.models.stock_list import StockList
 
         stock_list = (
             self.db.query(StockList)
@@ -262,7 +262,7 @@ class BacktestService:
 
         for path in possible_paths:
             if path.exists():
-                with open(path, "r") as f:
+                with open(path) as f:
                     stocks = [
                         line.strip() for line in f if line.strip() and not line.startswith("#")
                     ]
@@ -270,47 +270,133 @@ class BacktestService:
 
         raise FileNotFoundError(f"Stock list not found: {stock_list_name}")
 
+    def _fetch_historical_data_from_db(
+        self,
+        stock_code: str,
+        start_date: date,
+        end_date: date,
+    ) -> pd.DataFrame | None:
+        """
+        Fetch historical data from local database using optimized raw SQL.
+
+        Performance improvements:
+        1. Raw SQL bypasses ORM overhead
+        2. pandas.read_sql_query creates DataFrame directly
+        3. Index-optimized query (stock_code, date)
+
+        Args:
+            stock_code: 6-digit stock code
+            start_date: Query start date
+            end_date: Query end date
+
+        Returns:
+            DataFrame with columns: [Open, High, Low, Close, Volume] or None
+        """
+        query = text(
+            """
+            SELECT date, open, high, low, close, volume
+            FROM historical_prices
+            WHERE stock_code = :code
+              AND date >= :start_date
+              AND date <= :end_date
+            ORDER BY date ASC
+        """
+        )
+
+        try:
+            connection = self.db.get_bind().connect()
+            try:
+                df = pd.read_sql_query(
+                    query,
+                    connection,
+                    params={
+                        "code": stock_code,
+                        "start_date": start_date.isoformat(),
+                        "end_date": end_date.isoformat(),
+                    },
+                    index_col="date",
+                    parse_dates=["date"],
+                )
+            finally:
+                connection.close()
+
+            if len(df) < 30:
+                logger.debug(f"Insufficient DB data for {stock_code}: {len(df)} records")
+                return None
+
+            # Rename columns to match expected format
+            df.columns = ["Open", "High", "Low", "Close", "Volume"]
+            df.index = pd.to_datetime(df.index)
+
+            return df
+
+        except Exception as e:
+            logger.debug(f"DB fetch failed for {stock_code}: {e}")
+            return None
+
+    def _fetch_historical_data_from_yfinance(
+        self,
+        stock_code: str,
+        start_date: date,
+        end_date: date,
+    ) -> pd.DataFrame | None:
+        """Fetch historical data from yfinance API (fallback)."""
+        for suffix in [".KS", ".KQ"]:
+            ticker = f"{stock_code}{suffix}"
+            try:
+                df = yf.download(
+                    ticker,
+                    start=start_date.isoformat(),
+                    end=(end_date + timedelta(days=1)).isoformat(),
+                    progress=False,
+                    auto_adjust=False,
+                )
+                if not df.empty:
+                    break
+            except Exception:
+                continue
+        else:
+            return None
+
+        if df.empty or len(df) < 30:
+            return None
+
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        return df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+
     def _fetch_all_data(
         self,
         stock_codes: list[str],
         start_date: date,
         end_date: date,
     ) -> dict[str, pd.DataFrame]:
-        """Fetch all stock data upfront."""
+        """Fetch all stock data: DB first, yfinance as fallback."""
         # Add buffer for indicator calculation
         start_with_buffer = start_date - timedelta(days=60)
 
         all_data = {}
+        db_hits = 0
+        yf_hits = 0
 
         for code in stock_codes:
-            ticker = f"{code}.KS"
-            try:
-                df = yf.download(
-                    ticker,
-                    start=start_with_buffer.isoformat(),
-                    end=(end_date + timedelta(days=1)).isoformat(),
-                    progress=False,
-                    auto_adjust=False,
-                )
+            # Try DB first (fast)
+            df = self._fetch_historical_data_from_db(code, start_with_buffer, end_date)
 
-                if df.empty:
-                    ticker = f"{code}.KQ"
-                    df = yf.download(
-                        ticker,
-                        start=start_with_buffer.isoformat(),
-                        end=(end_date + timedelta(days=1)).isoformat(),
-                        progress=False,
-                        auto_adjust=False,
-                    )
+            if df is not None:
+                all_data[code] = df
+                db_hits += 1
+                continue
 
-                if not df.empty and len(df) >= 30:
-                    if isinstance(df.columns, pd.MultiIndex):
-                        df.columns = df.columns.get_level_values(0)
-                    all_data[code] = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+            # Fallback to yfinance (slow)
+            df = self._fetch_historical_data_from_yfinance(code, start_with_buffer, end_date)
 
-            except Exception as e:
-                logger.warning(f"Failed to fetch data for {code}: {e}")
+            if df is not None and len(df) >= 30:
+                all_data[code] = df
+                yf_hits += 1
 
+        logger.info(f"Data fetch complete: {db_hits} from DB, {yf_hits} from yfinance")
         return all_data
 
     def _run_simulation(
@@ -451,7 +537,7 @@ class BacktestService:
 
         return state
 
-    def _check_buy_signal(self, df: pd.DataFrame, date_str: str) -> Optional[dict]:
+    def _check_buy_signal(self, df: pd.DataFrame, date_str: str) -> dict | None:
         """Check for buy signal on given date."""
         try:
             idx = df.index.get_loc(pd.Timestamp(date_str))
@@ -492,7 +578,7 @@ class BacktestService:
         date_str: str,
         entry_price: float,
         partial_take_profit_executed: bool = False,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """Check for sell signal with priority: Stop Loss > Take Profit > Trend Breakdown."""
         try:
             idx = df.index.get_loc(pd.Timestamp(date_str))
@@ -627,7 +713,7 @@ class BacktestService:
             .all()
         )
 
-    def get_result(self, result_id: str, user_id: str) -> Optional[BacktestResult]:
+    def get_result(self, result_id: str, user_id: str) -> BacktestResult | None:
         """Get a specific backtest result."""
         return (
             self.db.query(BacktestResult)

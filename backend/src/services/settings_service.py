@@ -80,6 +80,13 @@ class SettingsService:
         # Metrics Configuration
         trading_days_per_year: Optional[int] = None,
         days_per_year: Optional[int] = None,
+        # MACD/RSI Contrarian Strategy Settings
+        macd_rsi_rsi_period: Optional[int] = None,
+        macd_rsi_rsi_threshold: Optional[float] = None,
+        macd_rsi_macd_fast_period: Optional[int] = None,
+        macd_rsi_macd_slow_period: Optional[int] = None,
+        macd_rsi_macd_signal_period: Optional[int] = None,
+        macd_rsi_confidence_threshold: Optional[float] = None,
     ) -> tuple[UserSettings, list[dict]]:
         """
         Update user settings.
@@ -101,6 +108,12 @@ class SettingsService:
             band_touch_tolerance: Band touch tolerance (0-0.01)
             trading_days_per_year: Trading days per year (200-365)
             days_per_year: Calendar days per year (360-366)
+            macd_rsi_rsi_period: RSI calculation period (2-50)
+            macd_rsi_rsi_threshold: RSI oversold threshold (10-50)
+            macd_rsi_macd_fast_period: MACD fast period (2-50, must be < slow)
+            macd_rsi_macd_slow_period: MACD slow period (5-100)
+            macd_rsi_macd_signal_period: MACD signal period (2-50)
+            macd_rsi_confidence_threshold: Contrarian signal confidence threshold (0-100)
 
         Returns:
             Tuple of (updated settings, constitution warnings)
@@ -185,6 +198,43 @@ class SettingsService:
             if days_per_year < 360 or days_per_year > 366:
                 raise ValueError("days_per_year must be between 360 and 366")
             settings.days_per_year = days_per_year
+
+        # MACD/RSI Contrarian Strategy Settings
+        if macd_rsi_rsi_period is not None:
+            if macd_rsi_rsi_period < 2 or macd_rsi_rsi_period > 50:
+                raise ValueError("macd_rsi_rsi_period must be between 2 and 50")
+            settings.macd_rsi_rsi_period = macd_rsi_rsi_period
+
+        if macd_rsi_rsi_threshold is not None:
+            if macd_rsi_rsi_threshold < 10 or macd_rsi_rsi_threshold > 50:
+                raise ValueError("macd_rsi_rsi_threshold must be between 10 and 50")
+            settings.macd_rsi_rsi_threshold = Decimal(str(macd_rsi_rsi_threshold))
+
+        if macd_rsi_macd_fast_period is not None:
+            if macd_rsi_macd_fast_period < 2 or macd_rsi_macd_fast_period > 50:
+                raise ValueError("macd_rsi_macd_fast_period must be between 2 and 50")
+            settings.macd_rsi_macd_fast_period = macd_rsi_macd_fast_period
+
+        if macd_rsi_macd_slow_period is not None:
+            if macd_rsi_macd_slow_period < 5 or macd_rsi_macd_slow_period > 100:
+                raise ValueError("macd_rsi_macd_slow_period must be between 5 and 100")
+            settings.macd_rsi_macd_slow_period = macd_rsi_macd_slow_period
+
+        if macd_rsi_macd_signal_period is not None:
+            if macd_rsi_macd_signal_period < 2 or macd_rsi_macd_signal_period > 50:
+                raise ValueError("macd_rsi_macd_signal_period must be between 2 and 50")
+            settings.macd_rsi_macd_signal_period = macd_rsi_macd_signal_period
+
+        if macd_rsi_confidence_threshold is not None:
+            if macd_rsi_confidence_threshold < 0 or macd_rsi_confidence_threshold > 100:
+                raise ValueError("macd_rsi_confidence_threshold must be between 0 and 100")
+            settings.macd_rsi_confidence_threshold = Decimal(str(macd_rsi_confidence_threshold))
+
+        # Cross-field validation: fast period must be less than slow period
+        fast = macd_rsi_macd_fast_period if macd_rsi_macd_fast_period is not None else settings.macd_rsi_macd_fast_period
+        slow = macd_rsi_macd_slow_period if macd_rsi_macd_slow_period is not None else settings.macd_rsi_macd_slow_period
+        if fast >= slow:
+            raise ValueError("macd_rsi_macd_fast_period must be less than macd_rsi_macd_slow_period")
 
         self.db.commit()
 

@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { SettingsForm } from '../components/settings/SettingsForm';
 import { UserSettings, ConstitutionWarning } from '../types';
 import { api } from '../services/api';
 
+type SettingsTab = 'risk' | 'bollinger' | 'contrarian' | 'advanced';
+
 export function SettingsPage() {
+  const [searchParams] = useSearchParams();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Get initial tab from URL query parameter
+  const tabParam = searchParams.get('tab');
+  const initialTab: SettingsTab = ['risk', 'bollinger', 'contrarian', 'advanced'].includes(tabParam || '')
+    ? (tabParam as SettingsTab)
+    : 'risk';
 
   useEffect(() => {
     fetchSettings();
@@ -67,6 +77,7 @@ export function SettingsPage() {
             initialSettings={settings}
             onSave={handleSave}
             isLoading={isLoading}
+            initialTab={initialTab}
           />
         </div>
       )}

@@ -97,7 +97,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         {/* Controls */}
@@ -107,22 +107,22 @@ export default function DashboardPage() {
               onClick={togglePrices}
               className={`px-3 py-1 text-sm rounded-full transition-colors ${
                 includePrices
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
               }`}
             >
               {includePrices ? '✓ 실시간 시세' : '시세 표시'}
             </button>
             <button
               onClick={handleRefresh}
-              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
               disabled={isLoading}
             >
               {isLoading ? '⟳' : '↻'} 새로고침
             </button>
           </div>
           {lastUpdated && (
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               마지막 갱신: {formatLastUpdated()}
               {includePrices && <span className="ml-2 text-xs">(30분마다 자동 갱신)</span>}
             </div>
@@ -130,7 +130,7 @@ export default function DashboardPage() {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-lg">
+          <div className="mb-6 p-4 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-lg">
             {error}
           </div>
         )}

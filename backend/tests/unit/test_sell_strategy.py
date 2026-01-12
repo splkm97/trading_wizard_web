@@ -33,6 +33,18 @@ def scanner():
     )
 
 
+@pytest.fixture
+def scanner_with_middle_band():
+    """Scanner with sell_on_middle_band enabled for trend breakdown tests."""
+    return SignalScanner(
+        confidence_threshold=60,
+        stop_loss_percent=5.0,
+        take_profit_pct=10.0,
+        take_profit_ratio=0.5,
+        sell_on_middle_band=True,
+    )
+
+
 class TestStopLoss:
     def test_stop_loss_triggers_at_exactly_minus_5_percent(self, scanner, mock_stock_data):
         mock_stock_data["Close"] = [9500.0]
@@ -181,11 +193,13 @@ class TestTakeProfit:
 
 
 class TestTrendBreakdown:
-    def test_trend_breakdown_triggers_when_close_below_middle_band(self, scanner, mock_stock_data):
+    def test_trend_breakdown_triggers_when_close_below_middle_band(
+        self, scanner_with_middle_band, mock_stock_data
+    ):
         mock_stock_data["Close"] = [9800.0]
         mock_stock_data["BB_Middle"] = [10000.0]
 
-        with patch.object(scanner, "_get_stock_data", return_value=mock_stock_data):
+        with patch.object(scanner_with_middle_band, "_get_stock_data", return_value=mock_stock_data):
             with patch("src.wizard.signal_scanner.get_stock_name", return_value="Test Stock"):
                 positions = [
                     {
@@ -196,7 +210,7 @@ class TestTrendBreakdown:
                     }
                 ]
 
-                signals = scanner.scan_for_sell_signals(positions)
+                signals = scanner_with_middle_band.scan_for_sell_signals(positions)
 
                 assert len(signals) == 1
                 assert signals[0].reason == "trend_broken_middle_band"
@@ -204,12 +218,12 @@ class TestTrendBreakdown:
                 assert signals[0].indicators["sell_ratio"] == 1.0
 
     def test_trend_breakdown_does_not_trigger_when_close_equals_middle_band(
-        self, scanner, mock_stock_data
+        self, scanner_with_middle_band, mock_stock_data
     ):
         mock_stock_data["Close"] = [10000.0]
         mock_stock_data["BB_Middle"] = [10000.0]
 
-        with patch.object(scanner, "_get_stock_data", return_value=mock_stock_data):
+        with patch.object(scanner_with_middle_band, "_get_stock_data", return_value=mock_stock_data):
             with patch("src.wizard.signal_scanner.get_stock_name", return_value="Test Stock"):
                 positions = [
                     {
@@ -220,15 +234,17 @@ class TestTrendBreakdown:
                     }
                 ]
 
-                signals = scanner.scan_for_sell_signals(positions)
+                signals = scanner_with_middle_band.scan_for_sell_signals(positions)
 
                 assert len(signals) == 0
 
-    def test_stop_loss_takes_priority_over_trend_breakdown(self, scanner, mock_stock_data):
+    def test_stop_loss_takes_priority_over_trend_breakdown(
+        self, scanner_with_middle_band, mock_stock_data
+    ):
         mock_stock_data["Close"] = [9400.0]
         mock_stock_data["BB_Middle"] = [10000.0]
 
-        with patch.object(scanner, "_get_stock_data", return_value=mock_stock_data):
+        with patch.object(scanner_with_middle_band, "_get_stock_data", return_value=mock_stock_data):
             with patch("src.wizard.signal_scanner.get_stock_name", return_value="Test Stock"):
                 positions = [
                     {
@@ -239,16 +255,18 @@ class TestTrendBreakdown:
                     }
                 ]
 
-                signals = scanner.scan_for_sell_signals(positions)
+                signals = scanner_with_middle_band.scan_for_sell_signals(positions)
 
                 assert len(signals) == 1
                 assert signals[0].reason == "stop_loss_hit"
 
-    def test_take_profit_and_trend_breakdown_can_coexist(self, scanner, mock_stock_data):
+    def test_take_profit_and_trend_breakdown_can_coexist(
+        self, scanner_with_middle_band, mock_stock_data
+    ):
         mock_stock_data["Close"] = [11000.0]
         mock_stock_data["BB_Middle"] = [11500.0]
 
-        with patch.object(scanner, "_get_stock_data", return_value=mock_stock_data):
+        with patch.object(scanner_with_middle_band, "_get_stock_data", return_value=mock_stock_data):
             with patch("src.wizard.signal_scanner.get_stock_name", return_value="Test Stock"):
                 positions = [
                     {
@@ -259,7 +277,7 @@ class TestTrendBreakdown:
                     }
                 ]
 
-                signals = scanner.scan_for_sell_signals(positions)
+                signals = scanner_with_middle_band.scan_for_sell_signals(positions)
 
                 assert len(signals) == 2
                 reasons = [s.reason for s in signals]

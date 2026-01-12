@@ -18,6 +18,7 @@ from src.wizard.recommendation import (
     RecommendationEngine,
     BuyRecommendation,
     format_buy_reason_detail,
+    format_signal_reason_detail,
 )
 from src.wizard.data_cache import refresh_cache, get_cache_info, is_cache_valid
 
@@ -75,8 +76,34 @@ class BuySignalResponse(BaseModel):
     current_price: float
     confidence_score: float
     reason: str
+    reason_detail: str
     indicators: dict
     affordable: bool
+
+
+class AppliedSettingsResponse(BaseModel):
+    """Settings that were applied to generate recommendations."""
+
+    # Risk Management
+    stop_loss_pct: float
+    max_positions: int
+    max_position_pct: float
+    confidence_threshold: int
+
+    # Take Profit
+    take_profit_pct: float
+    take_profit_ratio: float
+
+    # Sell Conditions
+    sell_on_middle_band: bool
+
+    # Bollinger Band
+    bollinger_period: int
+    bollinger_std_dev: float
+
+    # Squeeze Detection
+    squeeze_threshold_pct: int
+    squeeze_lookback_days: int
 
 
 class RecommendationsResponse(BaseModel):
@@ -85,12 +112,14 @@ class RecommendationsResponse(BaseModel):
     all_buy_signals: List[BuySignalResponse]  # All signals regardless of cash
     scanned_count: int
     signal_count: int
+    applied_settings: AppliedSettingsResponse  # Settings used for this scan
 
 
 @router.get("", response_model=RecommendationsResponse)
 async def get_recommendations(
     max_results: int = Query(default=5, ge=1, le=20),
     confidence_threshold: int = Query(default=60, ge=0, le=100),
+    force_refresh: bool = Query(default=False, description="Force refresh cache"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -99,7 +128,17 @@ async def get_recommendations(
 
     This endpoint scans the KOSPI Top 100 stocks and returns
     buy recommendations based on the Bollinger Band Squeeze strategy.
+
+    Set force_refresh=true to clear cache and fetch latest data.
     """
+    # Force refresh cache if requested
+    if force_refresh:
+        try:
+            from src.wizard.data_cache import refresh_cache
+            refresh_cache()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Cache refresh failed: {e}")
     # Get user's portfolio to check existing positions
     portfolio = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).first()
 
@@ -255,6 +294,7 @@ async def get_recommendations(
     for sig in signals:
         # Check if this stock is in the affordable recommendations
         is_affordable = sig.stock_code in recommended_codes
+        reason_detail = format_signal_reason_detail(sig)
         all_buy_signals.append(
             BuySignalResponse(
                 stock_code=sig.stock_code,
@@ -262,10 +302,26 @@ async def get_recommendations(
                 current_price=sig.current_price,
                 confidence_score=sig.confidence_score,
                 reason=sig.reason,
+                reason_detail=reason_detail,
                 indicators=sig.indicators,
                 affordable=is_affordable,
             )
         )
+
+    # Build applied settings response
+    applied_settings = AppliedSettingsResponse(
+        stop_loss_pct=stop_loss_pct,
+        max_positions=max_positions,
+        max_position_pct=max_position_pct,
+        confidence_threshold=confidence_threshold,
+        take_profit_pct=take_profit_pct,
+        take_profit_ratio=take_profit_ratio,
+        sell_on_middle_band=sell_on_middle_band,
+        bollinger_period=bollinger_period,
+        bollinger_std_dev=bollinger_std_dev,
+        squeeze_threshold_pct=squeeze_threshold_pct,
+        squeeze_lookback_days=squeeze_lookback_days,
+    )
 
     return RecommendationsResponse(
         buy_recommendations=buy_recs,
@@ -273,6 +329,7 @@ async def get_recommendations(
         all_buy_signals=all_buy_signals,
         scanned_count=len(stock_codes),
         signal_count=len(signals) + len(sell_recs),
+        applied_settings=applied_settings,
     )
 
 

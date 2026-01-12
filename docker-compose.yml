@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: trading_wizard
+      POSTGRES_PASSWORD: trading_wizard_pass
+      POSTGRES_DB: trading_wizard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading_wizard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -8,14 +24,16 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./data/trading_wizard.db
+      - DATABASE_URL=postgresql://trading_wizard:trading_wizard_pass@db:5432/trading_wizard
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-changeme-dev-secret-key}
       - JWT_ALGORITHM=HS256
       - JWT_EXPIRE_MINUTES=30
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
     volumes:
-      - ./data:/app/data
       - ./backend/src:/app/src:ro
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
@@ -40,5 +58,19 @@ services:
       timeout: 10s
       retries: 3
 
+  # PostgreSQL data refresh service (optional, run manually or schedule)
+  data-refresh:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["python", "-m", "scripts.bulk_load_historical_prices_postgres"]
+    environment:
+      - DATABASE_URL=postgresql://trading_wizard:trading_wizard_pass@db:5432/trading_wizard
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - tools  # Only runs when explicitly invoked: docker compose --profile tools run data-refresh
+
 volumes:
-  data:
+  postgres_data:

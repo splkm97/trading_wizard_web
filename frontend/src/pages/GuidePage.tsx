@@ -13,12 +13,12 @@ export function GuidePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">시작하기</h1>
-          <p className="text-gray-600 mt-1">Trading Wizard 사용 가이드</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">시작하기</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Trading Wizard 사용 가이드</p>
         </div>
       </header>
 

@@ -9,13 +9,13 @@ export function GuideContent() {
     <div className="space-y-8">
       {/* Section 1: 애플리케이션 소개 */}
       <section>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">애플리케이션 소개</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">애플리케이션 소개</h2>
         <Card>
           <div className="space-y-4">
-            <p className="text-gray-700">
+            <p className="text-gray-700 dark:text-gray-300">
               <strong>Trading Wizard</strong>는 기술적 지표 기반 주식 매매 신호를 제공하는 웹 애플리케이션입니다.
             </p>
-            <ul className="list-disc list-inside text-gray-600 space-y-2">
+            <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 space-y-2">
               <li>KOSPI 상위 100개 종목을 대상으로 매수/매도 타이밍을 추천합니다</li>
               <li>신뢰도 점수 기반으로 투자 판단을 보조합니다</li>
               <li>감정적 매매를 방지하고 체계적인 투자를 도와드립니다</li>
@@ -26,7 +26,7 @@ export function GuideContent() {
 
       {/* Section 2: 빠른 시작 가이드 */}
       <section>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">빠른 시작 가이드</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">빠른 시작 가이드</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <QuickStartCard
             title="대시보드"
@@ -69,7 +69,7 @@ export function GuideContent() {
 
       {/* Section 3: 추천 전략 소개 */}
       <section>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">추천 전략 소개</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">추천 전략 소개</h2>
         <div className="space-y-4">
           {/* 볼린저 밴드 스퀴즈 전략 */}
           <CollapsibleSection
@@ -181,8 +181,8 @@ function QuickStartCard({ title, description, buttonText, onClick }: QuickStartC
   return (
     <Card>
       <div className="flex flex-col h-full">
-        <h3 className="font-semibold text-gray-900 mb-2">{title}</h3>
-        <p className="text-sm text-gray-600 mb-4 flex-grow">{description}</p>
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">{title}</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 flex-grow">{description}</p>
         <Button variant="secondary" size="sm" onClick={onClick}>
           {buttonText}
         </Button>

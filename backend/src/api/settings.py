@@ -47,6 +47,14 @@ class SettingsResponse(BaseModel):
     trading_days_per_year: int
     days_per_year: int
 
+    # MACD/RSI Contrarian Strategy Settings
+    macd_rsi_rsi_period: int
+    macd_rsi_rsi_threshold: float
+    macd_rsi_macd_fast_period: int
+    macd_rsi_macd_slow_period: int
+    macd_rsi_macd_signal_period: int
+    macd_rsi_confidence_threshold: float
+
     class Config:
         from_attributes = True
 
@@ -80,6 +88,14 @@ class SettingsUpdateRequest(BaseModel):
     # Metrics Configuration
     trading_days_per_year: Optional[int] = Field(None, ge=200, le=365, description="Trading days per year (200-365)")
     days_per_year: Optional[int] = Field(None, ge=360, le=366, description="Calendar days per year (360-366)")
+
+    # MACD/RSI Contrarian Strategy Settings
+    macd_rsi_rsi_period: Optional[int] = Field(None, ge=2, le=50, description="RSI period (2-50)")
+    macd_rsi_rsi_threshold: Optional[float] = Field(None, ge=10, le=50, description="RSI threshold for oversold (10-50)")
+    macd_rsi_macd_fast_period: Optional[int] = Field(None, ge=2, le=50, description="MACD fast period (2-50)")
+    macd_rsi_macd_slow_period: Optional[int] = Field(None, ge=5, le=100, description="MACD slow period (5-100)")
+    macd_rsi_macd_signal_period: Optional[int] = Field(None, ge=2, le=50, description="MACD signal period (2-50)")
+    macd_rsi_confidence_threshold: Optional[float] = Field(None, ge=0, le=100, description="Confidence threshold (0-100)")
 
 
 class ConstitutionWarning(BaseModel):
@@ -128,6 +144,13 @@ async def get_settings(
         # Metrics Configuration
         trading_days_per_year=settings.trading_days_per_year,
         days_per_year=settings.days_per_year,
+        # MACD/RSI Contrarian Strategy Settings
+        macd_rsi_rsi_period=settings.macd_rsi_rsi_period,
+        macd_rsi_rsi_threshold=float(settings.macd_rsi_rsi_threshold),
+        macd_rsi_macd_fast_period=settings.macd_rsi_macd_fast_period,
+        macd_rsi_macd_slow_period=settings.macd_rsi_macd_slow_period,
+        macd_rsi_macd_signal_period=settings.macd_rsi_macd_signal_period,
+        macd_rsi_confidence_threshold=float(settings.macd_rsi_confidence_threshold),
     )
 
 
@@ -167,6 +190,13 @@ async def update_settings(
             # Metrics Configuration
             trading_days_per_year=request.trading_days_per_year,
             days_per_year=request.days_per_year,
+            # MACD/RSI Contrarian Strategy Settings
+            macd_rsi_rsi_period=request.macd_rsi_rsi_period,
+            macd_rsi_rsi_threshold=request.macd_rsi_rsi_threshold,
+            macd_rsi_macd_fast_period=request.macd_rsi_macd_fast_period,
+            macd_rsi_macd_slow_period=request.macd_rsi_macd_slow_period,
+            macd_rsi_macd_signal_period=request.macd_rsi_macd_signal_period,
+            macd_rsi_confidence_threshold=request.macd_rsi_confidence_threshold,
         )
 
         return SettingsUpdateResponse(
@@ -192,6 +222,13 @@ async def update_settings(
                 # Metrics Configuration
                 trading_days_per_year=settings.trading_days_per_year,
                 days_per_year=settings.days_per_year,
+                # MACD/RSI Contrarian Strategy Settings
+                macd_rsi_rsi_period=settings.macd_rsi_rsi_period,
+                macd_rsi_rsi_threshold=float(settings.macd_rsi_rsi_threshold),
+                macd_rsi_macd_fast_period=settings.macd_rsi_macd_fast_period,
+                macd_rsi_macd_slow_period=settings.macd_rsi_macd_slow_period,
+                macd_rsi_macd_signal_period=settings.macd_rsi_macd_signal_period,
+                macd_rsi_confidence_threshold=float(settings.macd_rsi_confidence_threshold),
             ),
             warnings=[
                 ConstitutionWarning(

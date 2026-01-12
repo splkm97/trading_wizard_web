@@ -90,6 +90,7 @@ class TestSellSignalIntegration:
             stop_loss_percent=5.0,
             take_profit_pct=10.0,
             take_profit_ratio=0.5,
+            sell_on_middle_band=True,  # Required for trend breakdown
         )
         mock_stock_data["Close"] = [9800.0]
         mock_stock_data["BB_Middle"] = [10000.0]
@@ -144,6 +145,7 @@ class TestSellSignalIntegration:
             stop_loss_percent=5.0,
             take_profit_pct=10.0,
             take_profit_ratio=0.5,
+            sell_on_middle_band=True,  # Required for trend breakdown
         )
         mock_stock_data["Close"] = [11000.0]
         mock_stock_data["BB_Middle"] = [12000.0]

@@ -19,7 +19,7 @@ class BuyRecommendation:
     recommended_price: float
     quantity: int
     total_cost: float
-    confidence_score: int
+    confidence_score: float  # Changed from int to float for precision
     reason: str
     indicators: Dict[str, float]
 
@@ -155,6 +155,31 @@ def format_buy_reason_detail(rec: BuyRecommendation) -> str:
     lines.append(f"   - MACD({ind.get('macd_histogram', 0):.2f}): {'상승추세' if macd_pass else '하락추세'}")
     lines.append(f"   - 거래량({ind.get('volume_ratio', 0):.1f}x): {'평균 대비 급증' if volume_pass else '평균 수준'}")
     lines.append("")
-    lines.append(f"3. 신뢰도 점수: {rec.confidence_score}/100")
+    lines.append(f"3. 신뢰도 점수: {rec.confidence_score:.3f}/100")
+
+    return "\n".join(lines)
+
+
+def format_signal_reason_detail(sig: "StockSignal") -> str:
+    """Generate detailed explanation for BUY signal (regardless of affordability)."""
+    ind = sig.indicators
+
+    volume_pass = ind.get("volume_ratio", 0) >= 1.5
+    rsi_pass = 30 <= ind.get("rsi", 50) <= 70
+    macd_pass = ind.get("macd_histogram", 0) > 0
+
+    lines = []
+    lines.append(f"[매수 신호] {sig.stock_code} ({sig.stock_name})")
+    lines.append("")
+    lines.append("1. 볼린저 밴드 상단 돌파 (Squeeze Breakout)")
+    lines.append(f"   - 현재가 {sig.current_price:,.0f}원이 상단밴드 {ind.get('bb_upper', 0):,.0f}원을 돌파")
+    lines.append(f"   - 밴드폭: {ind.get('bb_width', 0):.2f}% (변동성 확대 중)")
+    lines.append("")
+    lines.append("2. 보조지표 분석")
+    lines.append(f"   - RSI({ind.get('rsi', 0):.1f}): {'중립구간' if rsi_pass else '과매수/과매도 구간'}")
+    lines.append(f"   - MACD({ind.get('macd_histogram', 0):.2f}): {'상승추세' if macd_pass else '하락추세'}")
+    lines.append(f"   - 거래량({ind.get('volume_ratio', 0):.1f}x): {'평균 대비 급증' if volume_pass else '평균 수준'}")
+    lines.append("")
+    lines.append(f"3. 신뢰도 점수: {sig.confidence_score:.3f}/100")
 
     return "\n".join(lines)

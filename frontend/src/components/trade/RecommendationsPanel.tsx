@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '../common';
 import { api } from '../../services/api';
+import { AppliedSettings } from '../../types';
 
 interface BuyRecommendation {
   stock_code: string;
@@ -39,6 +40,7 @@ interface BuySignal {
   current_price: number;
   confidence_score: number;
   reason: string;
+  reason_detail: string;
   indicators: Record<string, number>;
   affordable: boolean;
 }
@@ -49,6 +51,7 @@ interface RecommendationsResponse {
   all_buy_signals: BuySignal[];
   scanned_count: number;
   signal_count: number;
+  applied_settings: AppliedSettings;
 }
 
 interface RecommendationsPanelProps {
@@ -61,24 +64,29 @@ export default function RecommendationsPanel({
   const [buyRecs, setBuyRecs] = useState<BuyRecommendation[]>([]);
   const [sellRecs, setSellRecs] = useState<SellRecommendation[]>([]);
   const [allBuySignals, setAllBuySignals] = useState<BuySignal[]>([]);
+  const [appliedSettings, setAppliedSettings] = useState<AppliedSettings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scannedCount, setScannedCount] = useState(0);
   const [expandedBuyIndex, setExpandedBuyIndex] = useState<number | null>(null);
+  const [expandedSignalIndex, setExpandedSignalIndex] = useState<number | null>(null);
   const [showAllSignals, setShowAllSignals] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
-  const fetchRecommendations = async () => {
+  const fetchRecommendations = async (forceRefresh: boolean = false) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await api.get<RecommendationsResponse>(
-        '/recommendations?max_results=5'
-      );
+      const url = forceRefresh
+        ? '/recommendations?max_results=5&force_refresh=true'
+        : '/recommendations?max_results=5';
+      const response = await api.get<RecommendationsResponse>(url);
       setBuyRecs(response.buy_recommendations);
       setSellRecs(response.sell_recommendations);
       setAllBuySignals(response.all_buy_signals || []);
       setScannedCount(response.scanned_count);
+      setAppliedSettings(response.applied_settings);
     } catch (err) {
       setError('추천 데이터를 불러오는데 실패했습니다.');
       console.error('Failed to fetch recommendations:', err);
@@ -142,7 +150,7 @@ export default function RecommendationsPanel({
         <div className="text-center py-4">
           <p className="text-red-500 mb-3">{error}</p>
           <button
-            onClick={fetchRecommendations}
+            onClick={() => fetchRecommendations(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             다시 시도
@@ -155,6 +163,96 @@ export default function RecommendationsPanel({
   return (
     <Card title="Daily Wizard 추천">
       <div className="space-y-4">
+        {/* Applied Settings Summary */}
+        {appliedSettings && (
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <div
+              className="flex justify-between items-center cursor-pointer"
+              onClick={() => setShowSettings(!showSettings)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-700">적용된 설정</span>
+                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                  활성
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">
+                  신뢰도 ≥{appliedSettings.confidence_threshold}점 | 손절 {appliedSettings.stop_loss_pct}%
+                </span>
+                <span className="text-gray-400 text-xs">
+                  {showSettings ? '▲' : '▼'}
+                </span>
+              </div>
+            </div>
+
+            {showSettings && (
+              <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                <div className="col-span-2 text-gray-500 font-medium mb-1">리스크 관리</div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">손절선:</span>
+                  <span className="text-gray-700">{appliedSettings.stop_loss_pct}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">최대 포지션:</span>
+                  <span className="text-gray-700">{appliedSettings.max_positions}개</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">종목당 비중:</span>
+                  <span className="text-gray-700">{appliedSettings.max_position_pct}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">신뢰도 임계값:</span>
+                  <span className="text-gray-700">{appliedSettings.confidence_threshold}점</span>
+                </div>
+
+                <div className="col-span-2 text-gray-500 font-medium mt-2 mb-1">익절/매도</div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">익절 목표:</span>
+                  <span className="text-gray-700">{appliedSettings.take_profit_pct}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">익절 비율:</span>
+                  <span className="text-gray-700">{(appliedSettings.take_profit_ratio * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between col-span-2">
+                  <span className="text-gray-500">중간밴드 하향 시 매도:</span>
+                  <span className={appliedSettings.sell_on_middle_band ? 'text-green-600' : 'text-gray-400'}>
+                    {appliedSettings.sell_on_middle_band ? '활성' : '비활성'}
+                  </span>
+                </div>
+
+                <div className="col-span-2 text-gray-500 font-medium mt-2 mb-1">볼린저밴드</div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">기간:</span>
+                  <span className="text-gray-700">{appliedSettings.bollinger_period}일</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">표준편차:</span>
+                  <span className="text-gray-700">{appliedSettings.bollinger_std_dev}σ</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">스퀴즈 임계값:</span>
+                  <span className="text-gray-700">{appliedSettings.squeeze_threshold_pct}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">스퀴즈 관측일:</span>
+                  <span className="text-gray-700">{appliedSettings.squeeze_lookback_days}일</span>
+                </div>
+
+                <div className="col-span-2 mt-2 pt-2 border-t border-gray-200">
+                  <a
+                    href="/settings"
+                    className="text-blue-600 hover:text-blue-800 text-xs"
+                  >
+                    설정 변경하기 →
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Summary */}
         <div className="flex justify-between items-center text-sm text-gray-500 pb-2 border-b">
           <span>스캔: {scannedCount}개</span>
@@ -166,10 +264,11 @@ export default function RecommendationsPanel({
             {showAllSignals ? '추천만 보기' : '전체 신호 보기'}
           </button>
           <button
-            onClick={fetchRecommendations}
+            onClick={() => fetchRecommendations(true)}
             className="text-blue-600 hover:text-blue-800"
+            title="캐시 무시하고 최신 데이터로 새로고침"
           >
-            새로고침
+            🔄 새로고침
           </button>
         </div>
 
@@ -182,16 +281,21 @@ export default function RecommendationsPanel({
               </span>
               감지된 매수 신호 ({allBuySignals.length}개)
             </h3>
-            {allBuySignals.map((sig) => (
+            {allBuySignals.map((sig, index) => (
               <div
                 key={sig.stock_code}
-                className={`border rounded-lg p-3 ${
+                className={`border rounded-lg overflow-hidden ${
                   sig.affordable
                     ? 'border-green-200 bg-green-50'
                     : 'border-gray-200 bg-gray-50'
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div
+                  className="flex items-center justify-between p-3 cursor-pointer hover:bg-opacity-80"
+                  onClick={() =>
+                    setExpandedSignalIndex(expandedSignalIndex === index ? null : index)
+                  }
+                >
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{sig.stock_name}</span>
@@ -199,7 +303,7 @@ export default function RecommendationsPanel({
                       <span
                         className={`text-xs px-2 py-0.5 rounded ${getConfidenceBgColor(sig.confidence_score)} ${getConfidenceColor(sig.confidence_score)}`}
                       >
-                        {sig.confidence_score}점
+                        {sig.confidence_score.toFixed(3)}점
                       </span>
                       {!sig.affordable && (
                         <span className="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700">
@@ -211,11 +315,30 @@ export default function RecommendationsPanel({
                       현재가: {formatKRW(sig.current_price)}원
                     </div>
                   </div>
-                  <div className="text-right text-xs text-gray-500">
-                    <div>RSI: {sig.indicators.rsi?.toFixed(1)}</div>
-                    <div>거래량: {sig.indicators.volume_ratio?.toFixed(1)}x</div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right text-xs text-gray-500">
+                      <div>RSI: {sig.indicators.rsi?.toFixed(1)}</div>
+                      <div>거래량: {sig.indicators.volume_ratio?.toFixed(1)}x</div>
+                    </div>
+                    <span className="text-gray-400">
+                      {expandedSignalIndex === index ? '▲' : '▼'}
+                    </span>
                   </div>
                 </div>
+
+                {expandedSignalIndex === index && (
+                  <div className="p-3 bg-white border-t text-sm">
+                    <div className="p-2 bg-gray-50 rounded border text-xs whitespace-pre-line mb-3">
+                      {sig.reason_detail}
+                    </div>
+
+                    {!sig.affordable && (
+                      <div className="p-2 bg-orange-50 rounded border border-orange-200 text-xs text-orange-700">
+                        현재 잔액으로는 이 종목을 매수할 수 없습니다. 잔액을 확인해주세요.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -295,7 +418,7 @@ export default function RecommendationsPanel({
                       <span
                         className={`text-xs px-2 py-0.5 rounded ${getConfidenceBgColor(rec.confidence_score)} ${getConfidenceColor(rec.confidence_score)}`}
                       >
-                        {rec.confidence_score}점
+                        {rec.confidence_score.toFixed(3)}점
                       </span>
                     </div>
                     <div className="text-sm text-gray-600 mt-1">

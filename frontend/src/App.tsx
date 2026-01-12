@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { Navigation } from './components/common/Navigation';
 import { Disclaimer } from './components/common/Disclaimer';
@@ -36,11 +37,12 @@ function FirstVisitRedirect() {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-        <Disclaimer />
-        <Navigation />
-        <FirstVisitRedirect />
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+          <Disclaimer />
+          <Navigation />
+          <FirstVisitRedirect />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -116,9 +118,10 @@ function App() {
             }
           />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

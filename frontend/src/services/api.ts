@@ -2,6 +2,11 @@
  * API client for Trading Wizard Web backend.
  */
 
+import type {
+  ContrarianSignalsResponse,
+  SingleContrarianSignalResponse,
+} from '../types';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface RequestOptions {
@@ -126,5 +131,36 @@ class ApiClient {
 
 // Singleton instance
 export const api = new ApiClient(API_BASE_URL);
+
+// Contrarian Strategy API functions
+
+/**
+ * Get MACD/RSI contrarian signals.
+ * Scans for stocks with RSI oversold + MACD golden cross.
+ *
+ * @param maxResults - Maximum number of signals to return (default: 10)
+ * @param scanDate - Date to scan for signals (YYYY-MM-DD format, defaults to today)
+ */
+export async function getContrarianSignals(
+  maxResults: number = 10,
+  scanDate?: string
+): Promise<ContrarianSignalsResponse> {
+  let url = `/contrarian/signals?max_results=${maxResults}`;
+  if (scanDate) {
+    url += `&scan_date=${scanDate}`;
+  }
+  return api.get<ContrarianSignalsResponse>(url);
+}
+
+/**
+ * Get contrarian signal for a specific stock.
+ */
+export async function getContrarianSignalForStock(
+  stockCode: string
+): Promise<SingleContrarianSignalResponse> {
+  return api.get<SingleContrarianSignalResponse>(
+    `/contrarian/signal/${stockCode}`
+  );
+}
 
 export type { ApiError };
