@@ -7,8 +7,10 @@
 
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ContrarianPanel } from '../components/contrarian';
+import { ContrarianPanel, CandidatesPanel } from '../components/contrarian';
 import { Button, DatePicker } from '../components/common';
+
+type TabType = 'signals' | 'candidates';
 
 // Helper to get today's date in YYYY-MM-DD format
 function getTodayString(): string {
@@ -19,6 +21,7 @@ function getTodayString(): string {
 export function ContrarianPage() {
   const navigate = useNavigate();
   const [scanDate, setScanDate] = useState<string>(getTodayString());
+  const [activeTab, setActiveTab] = useState<TabType>('signals');
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -80,6 +83,32 @@ export function ContrarianPage() {
                 오늘로 돌아가기
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="mb-6">
+          <div className="flex gap-2 p-1 bg-gray-200 rounded-lg w-fit">
+            <button
+              onClick={() => setActiveTab('signals')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'signals'
+                  ? 'bg-white text-purple-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              매수 신호
+            </button>
+            <button
+              onClick={() => setActiveTab('candidates')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'candidates'
+                  ? 'bg-white text-purple-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              예비 신호 (후보군)
+            </button>
           </div>
         </div>
 
@@ -241,9 +270,13 @@ export function ContrarianPage() {
             </div>
           </div>
 
-          {/* Right Column - Contrarian Panel */}
+          {/* Right Column - Signal/Candidates Panel */}
           <div className="lg:col-span-2">
-            <ContrarianPanel scanDate={scanDate} />
+            {activeTab === 'signals' ? (
+              <ContrarianPanel scanDate={scanDate} />
+            ) : (
+              <CandidatesPanel scanDate={scanDate} />
+            )}
           </div>
         </div>
       </main>

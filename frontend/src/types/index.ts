@@ -216,6 +216,41 @@ export interface SingleContrarianSignalResponse {
   applied_settings: AppliedContrarianSettings;
 }
 
+// Contrarian Candidate (Pre-Signal) Types
+export type ContrarianCandidateStage =
+  | 'RSI_OVERSOLD_WAITING'
+  | 'MACD_CROSSED_RSI_RECOVERING'
+  | 'APPROACHING';
+
+export interface ContrarianCandidateIndicators {
+  rsi: number;
+  macd: number;
+  macd_signal: number;
+  macd_histogram: number;
+  signal_stage: ContrarianCandidateStage;
+  reason_detail: string;
+}
+
+export interface ContrarianCandidate {
+  stock_code: string;
+  stock_name: string;
+  signal_type: 'CANDIDATE';
+  signal_stage: ContrarianCandidateStage;
+  confidence_score: number;
+  current_price: number;
+  reason: string;
+  reason_detail: string;
+  indicators: ContrarianCandidateIndicators;
+}
+
+export interface ContrarianCandidatesResponse {
+  candidates: ContrarianCandidate[];
+  scanned_count: number;
+  candidate_count: number;
+  applied_settings: AppliedContrarianSettings;
+  scan_date: string;
+}
+
 // Applied Settings (from recommendations API)
 export interface AppliedSettings {
   // Risk Management

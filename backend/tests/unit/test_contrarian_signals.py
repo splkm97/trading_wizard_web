@@ -453,3 +453,193 @@ class TestFormatContrarianReasonDetail:
         # Should have two main parts connected by period
         parts = result.split(".")
         assert len(parts) >= 3  # At least RSI desc, MACD desc, rebound message
+
+
+class TestScanForContrarianCandidates:
+    """Tests for scan_for_contrarian_candidates() method."""
+
+    @pytest.fixture
+    def mock_candidate_stock_data(self):
+        """Create mock stock data for candidate testing."""
+        # Create 40 rows of data
+        dates = pd.date_range(start='2024-01-01', periods=40, freq='D')
+        data = {
+            'Close': [50000.0] * 40,
+            'MACD': [-0.5] * 38 + [-0.3, -0.2],  # MACD rising but still below signal
+            'MACD_Signal': [0.0] * 40,  # MACD < Signal
+            'MACD_Histogram': [-0.5] * 38 + [-0.3, -0.2],  # Rising but still negative
+            'RSI': [50.0] * 38 + [28.0, 28.0],  # Oversold
+            'BB_Width': [0.1] * 40,
+        }
+        return pd.DataFrame(data, index=dates)
+
+    @patch.object(SignalScanner, '_get_stock_data')
+    @patch('src.wizard.signal_scanner.get_stock_name')
+    def test_rsi_oversold_waiting_detected(self, mock_get_name, mock_get_data, mock_candidate_stock_data):
+        """RSI oversold with rising MACD histogram should be RSI_OVERSOLD_WAITING."""
+        mock_get_data.return_value = mock_candidate_stock_data
+        mock_get_name.return_value = "Test Stock"
+
+        scanner = SignalScanner()
+        candidates = scanner.scan_for_contrarian_candidates(
+            stock_codes=["005930"],
+            rsi_threshold_max=40.0,
+            confidence_threshold=20.0,
+        )
+
+        assert len(candidates) == 1
+        assert candidates[0].signal_type == "CANDIDATE"
+        assert candidates[0].indicators["signal_stage"] == "RSI_OVERSOLD_WAITING"
+        assert "RSI" in candidates[0].indicators["reason_detail"]
+        assert "과매도" in candidates[0].indicators["reason_detail"]
+
+    @patch.object(SignalScanner, '_get_stock_data')
+    @patch('src.wizard.signal_scanner.get_stock_name')
+    def test_macd_crossed_rsi_recovering_detected(self, mock_get_name, mock_get_data):
+        """MACD golden cross with recovering RSI should be MACD_CROSSED_RSI_RECOVERING."""
+        # Create data where MACD crosses but RSI > 30
+        dates = pd.date_range(start='2024-01-01', periods=40, freq='D')
+        data = {
+            'Close': [50000.0] * 40,
+            'MACD': [-0.3] * 38 + [-0.1, 0.1],  # Crosses from below to above
+            'MACD_Signal': [0.0] * 40,  # Signal at 0
+            'MACD_Histogram': [-0.3] * 38 + [-0.1, 0.1],  # Crosses to positive
+            'RSI': [50.0] * 38 + [35.0, 35.0],  # Above 30 but below 40
+            'BB_Width': [0.1] * 40,
+        }
+        df = pd.DataFrame(data, index=dates)
+        mock_get_data.return_value = df
+        mock_get_name.return_value = "Test Stock"
+
+        scanner = SignalScanner()
+        candidates = scanner.scan_for_contrarian_candidates(
+            stock_codes=["005930"],
+            rsi_threshold_max=40.0,
+            confidence_threshold=20.0,
+        )
+
+        assert len(candidates) == 1
+        assert candidates[0].indicators["signal_stage"] == "MACD_CROSSED_RSI_RECOVERING"
+        assert "MACD" in candidates[0].indicators["reason_detail"]
+        assert "골든크로스" in candidates[0].indicators["reason_detail"]
+
+    @patch.object(SignalScanner, '_get_stock_data')
+    @patch('src.wizard.signal_scanner.get_stock_name')
+    def test_approaching_detected(self, mock_get_name, mock_get_data):
+        """Both indicators approaching thresholds should be APPROACHING."""
+        # Create data where both RSI and MACD are approaching
+        dates = pd.date_range(start='2024-01-01', periods=40, freq='D')
+        data = {
+            'Close': [50000.0] * 40,
+            'MACD': [-0.2] * 38 + [-0.15, -0.1],
+            'MACD_Signal': [0.0] * 40,
+            'MACD_Histogram': [-0.4] * 38 + [-0.3, -0.2],  # Rising but < 0 and >= -0.5
+            'RSI': [50.0] * 38 + [35.0, 35.0],  # Between 30 and 40
+            'BB_Width': [0.1] * 40,
+        }
+        df = pd.DataFrame(data, index=dates)
+        mock_get_data.return_value = df
+        mock_get_name.return_value = "Test Stock"
+
+        scanner = SignalScanner()
+        candidates = scanner.scan_for_contrarian_candidates(
+            stock_codes=["005930"],
+            rsi_threshold_max=40.0,
+            confidence_threshold=20.0,
+        )
+
+        assert len(candidates) == 1
+        assert candidates[0].indicators["signal_stage"] == "APPROACHING"
+        assert "접근" in candidates[0].indicators["reason_detail"]
+
+    @patch.object(SignalScanner, '_get_stock_data')
+    @patch('src.wizard.signal_scanner.get_stock_name')
+    @patch('src.wizard.signal_scanner.detect_macd_golden_cross')
+    def test_full_signal_excluded_from_candidates(self, mock_cross, mock_get_name, mock_get_data, mock_candidate_stock_data):
+        """Stocks with full signal conditions should not be candidates."""
+        # Modify data to have RSI <= 30 and golden cross (full signal)
+        df = mock_candidate_stock_data.copy()
+        df["RSI"] = [50.0] * 38 + [25.0, 25.0]  # Oversold
+        mock_get_data.return_value = df
+        mock_get_name.return_value = "Test Stock"
+        mock_cross.return_value = True  # Golden cross detected
+
+        scanner = SignalScanner()
+        candidates = scanner.scan_for_contrarian_candidates(
+            stock_codes=["005930"],
+            rsi_threshold_max=40.0,
+            confidence_threshold=20.0,
+        )
+
+        # Full signal should be excluded from candidates
+        assert len(candidates) == 0
+
+    @patch.object(SignalScanner, '_get_stock_data')
+    @patch('src.wizard.signal_scanner.get_stock_name')
+    def test_rsi_above_max_threshold_excluded(self, mock_get_name, mock_get_data):
+        """Stocks with RSI above max threshold should be excluded."""
+        dates = pd.date_range(start='2024-01-01', periods=40, freq='D')
+        data = {
+            'Close': [50000.0] * 40,
+            'MACD': [-0.5] * 40,
+            'MACD_Signal': [0.0] * 40,
+            'MACD_Histogram': [-0.5] * 38 + [-0.3, -0.2],
+            'RSI': [50.0] * 38 + [45.0, 45.0],  # Above 40 threshold
+            'BB_Width': [0.1] * 40,
+        }
+        df = pd.DataFrame(data, index=dates)
+        mock_get_data.return_value = df
+        mock_get_name.return_value = "Test Stock"
+
+        scanner = SignalScanner()
+        candidates = scanner.scan_for_contrarian_candidates(
+            stock_codes=["005930"],
+            rsi_threshold_max=40.0,
+            confidence_threshold=20.0,
+        )
+
+        assert len(candidates) == 0
+
+    @patch.object(SignalScanner, '_get_stock_data')
+    @patch('src.wizard.signal_scanner.get_stock_name')
+    def test_candidates_sorted_by_confidence(self, mock_get_name, mock_get_data, mock_candidate_stock_data):
+        """Candidates should be sorted by confidence descending."""
+        def side_effect(stock_code):
+            df = mock_candidate_stock_data.copy()
+            if stock_code == "005930":
+                df["RSI"] = [50.0] * 38 + [25.0, 25.0]  # Very oversold -> higher confidence
+            else:
+                df["RSI"] = [50.0] * 38 + [29.0, 29.0]  # Mildly oversold -> lower confidence
+            return df
+
+        mock_get_data.side_effect = side_effect
+        mock_get_name.return_value = "Test Stock"
+
+        scanner = SignalScanner()
+        candidates = scanner.scan_for_contrarian_candidates(
+            stock_codes=["000660", "005930"],
+            rsi_threshold_max=40.0,
+            confidence_threshold=20.0,
+        )
+
+        assert len(candidates) == 2
+        # Higher confidence (005930 with RSI 25) should be first
+        assert candidates[0].stock_code == "005930"
+        assert candidates[0].confidence_score > candidates[1].confidence_score
+
+    @patch.object(SignalScanner, '_get_stock_data')
+    @patch('src.wizard.signal_scanner.get_stock_name')
+    def test_max_results_respected(self, mock_get_name, mock_get_data, mock_candidate_stock_data):
+        """max_results should limit the number of candidates."""
+        mock_get_data.return_value = mock_candidate_stock_data
+        mock_get_name.return_value = "Test Stock"
+
+        scanner = SignalScanner()
+        candidates = scanner.scan_for_contrarian_candidates(
+            stock_codes=["005930", "000660", "035420"],
+            rsi_threshold_max=40.0,
+            confidence_threshold=20.0,
+            max_results=1,
+        )
+
+        assert len(candidates) <= 1

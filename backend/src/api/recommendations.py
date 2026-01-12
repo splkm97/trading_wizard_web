@@ -120,6 +120,7 @@ async def get_recommendations(
     max_results: int = Query(default=5, ge=1, le=20),
     confidence_threshold: int = Query(default=60, ge=0, le=100),
     force_refresh: bool = Query(default=False, description="Force refresh cache"),
+    refresh: bool = Query(default=False, description="Fetch realtime prices for stale data"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -129,7 +130,8 @@ async def get_recommendations(
     This endpoint scans the KOSPI Top 100 stocks and returns
     buy recommendations based on the Bollinger Band Squeeze strategy.
 
-    Set force_refresh=true to clear cache and fetch latest data.
+    - refresh=true: Fetch realtime prices from yfinance for stocks with stale DB data
+    - force_refresh=true: Refresh entire cache (slower, downloads all data)
     """
     # Force refresh cache if requested
     if force_refresh:
@@ -207,6 +209,7 @@ async def get_recommendations(
         stock_codes=stock_codes,
         existing_positions=existing_positions,
         max_results=max_results * 2,  # Get more signals for filtering
+        force_realtime=refresh,  # Fetch realtime prices only when explicitly requested
     )
 
     # Generate recommendations with position sizing from user settings

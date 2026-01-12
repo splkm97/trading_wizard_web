@@ -5,6 +5,7 @@
 import type {
   ContrarianSignalsResponse,
   SingleContrarianSignalResponse,
+  ContrarianCandidatesResponse,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -161,6 +162,28 @@ export async function getContrarianSignalForStock(
   return api.get<SingleContrarianSignalResponse>(
     `/contrarian/signal/${stockCode}`
   );
+}
+
+/**
+ * Get contrarian candidates (pre-signals).
+ *
+ * Scans for stocks approaching signal conditions:
+ * - RSI_OVERSOLD_WAITING: RSI <= 30, MACD histogram rising
+ * - MACD_CROSSED_RSI_RECOVERING: MACD crossed, RSI recovering
+ * - APPROACHING: Both indicators approaching thresholds
+ *
+ * @param maxResults - Maximum number of candidates to return (default: 20)
+ * @param scanDate - Date to scan for candidates (YYYY-MM-DD format)
+ */
+export async function getContrarianCandidates(
+  maxResults: number = 20,
+  scanDate?: string
+): Promise<ContrarianCandidatesResponse> {
+  let url = `/contrarian/candidates?max_results=${maxResults}`;
+  if (scanDate) {
+    url += `&scan_date=${scanDate}`;
+  }
+  return api.get<ContrarianCandidatesResponse>(url);
 }
 
 export type { ApiError };

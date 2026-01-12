@@ -162,6 +162,9 @@ def fetch_stock_data_from_db(
 
         # Rename columns to match expected format
         df.columns = ["Open", "High", "Low", "Close", "Volume"]
+
+        # Convert index to DatetimeIndex for consistent date comparisons
+        df.index = pd.to_datetime(df.index)
         return df
 
     except Exception as e:
@@ -204,6 +207,138 @@ def fetch_stock_data(stock_code: str, days: int = 60) -> Optional[pd.DataFrame]:
 
     except Exception:
         return None
+
+
+# Realtime price cache (5-minute TTL)
+_realtime_cache: Dict[str, dict] = {}
+_realtime_cache_time: Dict[str, float] = {}
+_REALTIME_CACHE_TTL = 300  # 5 minutes
+
+
+def fetch_realtime_price(stock_code: str, use_cache: bool = True) -> Optional[Dict]:
+    """
+    Fetch real-time price from yfinance for a single stock.
+
+    Args:
+        stock_code: 6-digit stock code
+        use_cache: If True, use cached data within 5 minutes (default True)
+
+    Returns:
+        Dict with OHLCV data for today, or None if unavailable
+    """
+    import time
+
+    # Check cache first
+    if use_cache and stock_code in _realtime_cache:
+        cache_age = time.time() - _realtime_cache_time.get(stock_code, 0)
+        if cache_age < _REALTIME_CACHE_TTL:
+            logger.debug(f"{stock_code}: Using cached realtime price ({cache_age:.0f}s old)")
+            return _realtime_cache[stock_code]
+
+    ticker = f"{stock_code}.KS"
+    try:
+        stock = yf.Ticker(ticker)
+        # Try to get today's data
+        hist = stock.history(period="1d")
+
+        if hist.empty:
+            # Try KOSDAQ
+            ticker = f"{stock_code}.KQ"
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="1d")
+
+        if hist.empty:
+            return None
+
+        latest = hist.iloc[-1]
+        result = {
+            "date": hist.index[-1].date(),
+            "open": float(latest["Open"]),
+            "high": float(latest["High"]),
+            "low": float(latest["Low"]),
+            "close": float(latest["Close"]),
+            "volume": int(latest["Volume"]),
+        }
+
+        # Update cache
+        _realtime_cache[stock_code] = result
+        _realtime_cache_time[stock_code] = time.time()
+
+        return result
+    except Exception as e:
+        logger.debug(f"Realtime fetch failed for {stock_code}: {e}")
+        return None
+
+
+def is_market_open() -> bool:
+    """
+    Check if Korean stock market is currently open.
+
+    Market hours: 09:00 - 15:30 KST, weekdays only
+    """
+    from datetime import datetime
+    import pytz
+
+    try:
+        kst = pytz.timezone("Asia/Seoul")
+        now = datetime.now(kst)
+
+        # Weekday check (0=Monday, 6=Sunday)
+        if now.weekday() >= 5:  # Saturday or Sunday
+            return False
+
+        # Time check (09:00 - 15:30)
+        market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
+
+        return market_open <= now <= market_close
+    except Exception:
+        return False
+
+
+def get_last_trading_date() -> date:
+    """
+    Get the most recent trading date.
+
+    If today is a weekday before market close, returns today.
+    Otherwise returns the previous trading day.
+    """
+    from datetime import datetime
+    import pytz
+
+    try:
+        kst = pytz.timezone("Asia/Seoul")
+        now = datetime.now(kst)
+        today = now.date()
+
+        # If weekend, go back to Friday
+        if now.weekday() == 5:  # Saturday
+            return today - timedelta(days=1)
+        elif now.weekday() == 6:  # Sunday
+            return today - timedelta(days=2)
+
+        # Weekday - if market hasn't opened yet, use previous day
+        market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        if now < market_open:
+            if now.weekday() == 0:  # Monday before open
+                return today - timedelta(days=3)  # Friday
+            return today - timedelta(days=1)
+
+        return today
+    except Exception:
+        return date.today()
+
+
+def _to_date(value) -> date:
+    """Convert various date formats to date object."""
+    if hasattr(value, 'date'):
+        return value.date()
+    elif isinstance(value, str):
+        return date.fromisoformat(value)
+    elif isinstance(value, date):
+        return value
+    else:
+        return pd.Timestamp(value).date()
 
 
 def calculate_indicators(
@@ -457,24 +592,47 @@ class SignalScanner:
             except Exception:
                 pass
 
-    def _get_stock_data(self, stock_code: str) -> Optional[pd.DataFrame]:
+    def _get_stock_data(self, stock_code: str, force_realtime: bool = False) -> Optional[pd.DataFrame]:
         """
         Get stock data with PostgreSQL-first caching strategy.
 
         Priority:
-        1. PostgreSQL DB (primary source, most up-to-date)
+        1. PostgreSQL DB (primary source)
         2. Memory/disk cache (fallback if DB unavailable)
-        3. yfinance API (last resort)
+        3. yfinance API full download (last resort)
+
+        Realtime data is only fetched when force_realtime=True (explicit refresh).
 
         Args:
             stock_code: 6-digit stock code
+            force_realtime: If True, fetch realtime price for stale data
 
         Returns:
             DataFrame with indicators or None
         """
-        # L1: PostgreSQL DB (primary source - always has latest data)
+        # L1: PostgreSQL DB (primary source)
         df = fetch_stock_data_from_db(stock_code)
         if df is not None and len(df) >= 30:
+            # Only fetch realtime if explicitly requested
+            if force_realtime:
+                last_trading_day = get_last_trading_date()
+                db_latest_date = _to_date(df.index[-1])
+
+                if db_latest_date < last_trading_day:
+                    logger.debug(f"{stock_code}: DB data stale ({db_latest_date}), fetching realtime...")
+                    realtime = fetch_realtime_price(stock_code)
+
+                    if realtime and realtime["date"] > db_latest_date:
+                        new_row = pd.DataFrame({
+                            "Open": [realtime["open"]],
+                            "High": [realtime["high"]],
+                            "Low": [realtime["low"]],
+                            "Close": [realtime["close"]],
+                            "Volume": [realtime["volume"]],
+                        }, index=[pd.Timestamp(realtime["date"])])
+                        df = pd.concat([df, new_row])
+                        logger.info(f"{stock_code}: Appended realtime price {realtime['close']:,.0f} ({realtime['date']})")
+
             df = calculate_indicators(
                 df,
                 bollinger_period=self.bollinger_period,
@@ -490,6 +648,25 @@ class SignalScanner:
         self._load_cache()
         if stock_code in self._cache:
             cached_df = self._cache[stock_code].copy()
+
+            # Only fetch realtime if explicitly requested
+            if force_realtime:
+                last_trading_day = get_last_trading_date()
+                cache_latest_date = _to_date(cached_df.index[-1])
+
+                if cache_latest_date < last_trading_day:
+                    realtime = fetch_realtime_price(stock_code)
+                    if realtime and realtime["date"] > cache_latest_date:
+                        new_row = pd.DataFrame({
+                            "Open": [realtime["open"]],
+                            "High": [realtime["high"]],
+                            "Low": [realtime["low"]],
+                            "Close": [realtime["close"]],
+                            "Volume": [realtime["volume"]],
+                        }, index=[pd.Timestamp(realtime["date"])])
+                        cached_df = pd.concat([cached_df, new_row])
+                        logger.info(f"{stock_code}: Appended realtime to cache {realtime['close']:,.0f}")
+
             # Recalculate indicators with user settings
             cached_df = calculate_indicators(
                 cached_df,
@@ -522,14 +699,22 @@ class SignalScanner:
         stock_codes: List[str],
         existing_positions: Optional[List[str]] = None,
         max_results: int = 10,
+        force_realtime: bool = False,
     ) -> List[StockSignal]:
-        """Scan for BUY signals on stocks without positions."""
+        """Scan for BUY signals on stocks without positions.
+
+        Args:
+            stock_codes: List of stock codes to scan
+            existing_positions: Stock codes to exclude (already held)
+            max_results: Maximum signals to return
+            force_realtime: If True, fetch realtime prices for stale data
+        """
         signals = []
         existing = existing_positions or []
         candidates = [s for s in stock_codes if s not in existing]
 
         for stock_code in candidates:
-            df = self._get_stock_data(stock_code)
+            df = self._get_stock_data(stock_code, force_realtime=force_realtime)
             if df is None or len(df) < 35:
                 continue
             latest = df.iloc[-1]
@@ -845,6 +1030,214 @@ class SignalScanner:
         # Sort by confidence and return top results
         signals.sort(key=lambda x: x.confidence_score, reverse=True)
         return signals[:max_results]
+
+    def scan_for_contrarian_candidates(
+        self,
+        stock_codes: List[str],
+        rsi_threshold_max: float = 40.0,
+        confidence_threshold: float = 20.0,
+        max_results: int = 20,
+        target_date: Optional[date] = None,
+    ) -> List[StockSignal]:
+        """
+        Scan for MACD/RSI contrarian PRE-SIGNAL candidates.
+
+        Detects stocks that are approaching signal conditions but haven't triggered yet.
+
+        Candidate Stages:
+            1. RSI_OVERSOLD_WAITING: RSI <= 30, MACD histogram < 0 but rising
+               -> "RSI 과매도 상태. MACD 상향 돌파 대기 중"
+
+            2. MACD_CROSSED_RSI_RECOVERING: MACD golden cross occurred, 30 < RSI <= 40
+               -> "MACD 상향 돌파 발생. RSI 회복 중"
+
+            3. APPROACHING: 30 < RSI <= 40, MACD histogram approaching zero
+               -> "신호 조건 접근 중. 관심 종목"
+
+        Args:
+            stock_codes: List of stock codes to scan
+            rsi_threshold_max: Maximum RSI to consider for candidates (default 40)
+            confidence_threshold: Minimum confidence score (default 20)
+            max_results: Maximum number of candidates to return
+            target_date: Date to scan for candidates (defaults to latest available)
+
+        Returns:
+            List of StockSignal with candidate stages
+        """
+        candidates = []
+
+        for stock_code in stock_codes:
+            df = self._get_stock_data(stock_code)
+            if df is None or len(df) < 35:
+                continue
+
+            # If target_date is specified, filter data
+            if target_date is not None:
+                df_filtered = df[df.index.date <= target_date]
+                if len(df_filtered) < 35:
+                    continue
+                df_for_analysis = df_filtered
+            else:
+                df_for_analysis = df
+
+            latest = df_for_analysis.iloc[-1]
+            previous = df_for_analysis.iloc[-2] if len(df_for_analysis) >= 2 else None
+
+            # Check for NaN in required indicators
+            if pd.isna(latest["RSI"]) or pd.isna(latest["MACD"]) or pd.isna(latest["MACD_Signal"]):
+                continue
+
+            rsi = float(latest["RSI"])
+            macd = float(latest["MACD"])
+            macd_signal = float(latest["MACD_Signal"])
+            macd_histogram = float(latest["MACD_Histogram"])
+
+            # Get previous MACD histogram for trend detection
+            prev_macd_histogram = None
+            if previous is not None and not pd.isna(previous["MACD_Histogram"]):
+                prev_macd_histogram = float(previous["MACD_Histogram"])
+
+            # Skip if already a full signal (RSI <= 30 AND golden cross)
+            if rsi <= 30 and detect_macd_golden_cross(df_for_analysis):
+                continue
+
+            # Skip if RSI is too high
+            if rsi > rsi_threshold_max:
+                continue
+
+            stage = None
+            reason = None
+            reason_detail = None
+
+            # Stage 1: RSI oversold, waiting for MACD cross
+            # RSI <= 30 but MACD histogram < 0 (not yet crossed)
+            if rsi <= 30 and macd_histogram < 0:
+                # Check if MACD histogram is rising (approaching cross)
+                is_rising = prev_macd_histogram is not None and macd_histogram > prev_macd_histogram
+                if is_rising:
+                    stage = "RSI_OVERSOLD_WAITING"
+                    reason = "contrarian_rsi_oversold_waiting_for_macd"
+                    reason_detail = (
+                        f"RSI({rsi:.1f}) 과매도 상태. "
+                        f"MACD 히스토그램({macd_histogram:.2f}) 상승 중. "
+                        f"골든크로스 임박."
+                    )
+
+            # Stage 2: MACD crossed but RSI is recovering (not yet oversold)
+            elif detect_macd_golden_cross(df_for_analysis) and 30 < rsi <= rsi_threshold_max:
+                stage = "MACD_CROSSED_RSI_RECOVERING"
+                reason = "contrarian_macd_cross_rsi_recovering"
+                reason_detail = (
+                    f"MACD 골든크로스 발생. "
+                    f"RSI({rsi:.1f})가 과매도 영역(30 이하)으로 진입 대기 중."
+                )
+
+            # Stage 3: Both approaching - mild conditions
+            elif 30 < rsi <= rsi_threshold_max and -0.5 <= macd_histogram < 0:
+                is_rising = prev_macd_histogram is not None and macd_histogram > prev_macd_histogram
+                if is_rising:
+                    stage = "APPROACHING"
+                    reason = "contrarian_both_approaching"
+                    reason_detail = (
+                        f"RSI({rsi:.1f})와 MACD 히스토그램({macd_histogram:.2f}) 모두 "
+                        f"신호 조건에 접근 중. 관심 종목으로 모니터링 필요."
+                    )
+
+            if stage is None:
+                continue
+
+            # Calculate confidence based on how close to signal conditions
+            confidence = self._calculate_candidate_confidence(
+                rsi=rsi,
+                macd_histogram=macd_histogram,
+                stage=stage,
+            )
+
+            if confidence < confidence_threshold:
+                continue
+
+            stock_name = get_stock_name(stock_code)
+            candidates.append(
+                StockSignal(
+                    stock_code=stock_code,
+                    stock_name=stock_name,
+                    signal_type="CANDIDATE",
+                    confidence_score=confidence,
+                    current_price=float(latest["Close"]),
+                    reason=reason,
+                    indicators={
+                        "rsi": rsi,
+                        "macd": macd,
+                        "macd_signal": macd_signal,
+                        "macd_histogram": macd_histogram,
+                        "signal_stage": stage,
+                        "reason_detail": reason_detail,
+                    },
+                )
+            )
+
+        # Sort by confidence and return top results
+        candidates.sort(key=lambda x: x.confidence_score, reverse=True)
+        return candidates[:max_results]
+
+    def _calculate_candidate_confidence(
+        self,
+        rsi: float,
+        macd_histogram: float,
+        stage: str,
+    ) -> float:
+        """
+        Calculate confidence score for a candidate based on proximity to signal conditions.
+
+        Args:
+            rsi: Current RSI value
+            macd_histogram: Current MACD histogram value
+            stage: Candidate stage (RSI_OVERSOLD_WAITING, MACD_CROSSED_RSI_RECOVERING, APPROACHING)
+
+        Returns:
+            Confidence score (0-100)
+        """
+        confidence = 0.0
+
+        if stage == "RSI_OVERSOLD_WAITING":
+            # RSI is already oversold, high base score
+            confidence = 50.0
+            # Bonus for very low RSI
+            if rsi <= 25:
+                confidence += 15.0
+            elif rsi <= 28:
+                confidence += 10.0
+            # Bonus for MACD histogram close to zero (about to cross)
+            if macd_histogram >= -0.2:
+                confidence += 20.0
+            elif macd_histogram >= -0.5:
+                confidence += 10.0
+
+        elif stage == "MACD_CROSSED_RSI_RECOVERING":
+            # MACD already crossed, moderate base score
+            confidence = 40.0
+            # Bonus for RSI close to 30 (about to enter oversold)
+            if rsi <= 32:
+                confidence += 20.0
+            elif rsi <= 35:
+                confidence += 10.0
+            # Bonus for strong MACD histogram
+            if macd_histogram >= 0.3:
+                confidence += 10.0
+
+        elif stage == "APPROACHING":
+            # Both approaching, lower base score
+            confidence = 25.0
+            # Bonus for RSI close to 30
+            if rsi <= 32:
+                confidence += 10.0
+            elif rsi <= 35:
+                confidence += 5.0
+            # Bonus for MACD histogram close to zero
+            if macd_histogram >= -0.2:
+                confidence += 10.0
+
+        return min(confidence, 100.0)
 
     def get_current_prices(self, stock_codes: List[str]) -> Dict[str, float]:
         """Get current prices for a list of stocks."""
