@@ -2,10 +2,9 @@
 Stock universe scanner for daily trading signals.
 Fetches data from yfinance and calculates technical indicators.
 
-Optimized for PostgreSQL-first data access strategy:
-1. Memory cache (5min TTL)
-2. PostgreSQL DB (permanent storage)
-3. yfinance API (fallback)
+Simplified data access strategy:
+1. PostgreSQL DB (primary)
+2. yfinance API (if last_fetched_at > 30 minutes or force_fetch)
 """
 
 from __future__ import annotations
@@ -107,9 +106,13 @@ def load_kospi_top100(filepath: str = "kospi_top100.txt") -> List[str]:
     )
 
 
+# Rate limiting constant
+FETCH_INTERVAL_MINUTES = 30
+
+
 def fetch_stock_data_from_db(
     stock_code: str, days: int = 60, engine=None
-) -> Optional[pd.DataFrame]:
+) -> tuple[Optional[pd.DataFrame], Optional[datetime]]:
     """
     Fetch OHLCV data from PostgreSQL database (fast).
 
@@ -119,8 +122,10 @@ def fetch_stock_data_from_db(
         engine: SQLAlchemy engine (creates one if not provided)
 
     Returns:
-        DataFrame with OHLCV data or None
+        Tuple of (DataFrame with OHLCV data or None, last_fetched_at or None)
     """
+    from datetime import datetime
+
     end_date = date.today()
     start_date = end_date - timedelta(days=days + 30)
 
@@ -135,6 +140,15 @@ def fetch_stock_data_from_db(
     """
     )
 
+    # Separate query for last_fetched_at (get the most recent)
+    last_fetched_query = text(
+        """
+        SELECT MAX(last_fetched_at) as last_fetched
+        FROM historical_prices
+        WHERE stock_code = :code
+    """
+    )
+
     try:
         # Create engine if not provided
         if engine is None:
@@ -143,7 +157,7 @@ def fetch_stock_data_from_db(
 
                 engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
             except Exception:
-                return None
+                return None, None
 
         with engine.connect() as conn:
             df = pd.read_sql_query(
@@ -157,24 +171,29 @@ def fetch_stock_data_from_db(
                 index_col="date",
             )
 
+            # Get last_fetched_at
+            result = conn.execute(last_fetched_query, {"code": stock_code})
+            row = result.fetchone()
+            last_fetched_at = row[0] if row and row[0] else None
+
         if df.empty or len(df) < 30:
-            return None
+            return None, last_fetched_at
 
         # Rename columns to match expected format
         df.columns = ["Open", "High", "Low", "Close", "Volume"]
 
         # Convert index to DatetimeIndex for consistent date comparisons
         df.index = pd.to_datetime(df.index)
-        return df
+        return df, last_fetched_at
 
     except Exception as e:
         logger.debug(f"DB fetch failed for {stock_code}: {e}")
-        return None
+        return None, None
 
 
 def fetch_stock_data(stock_code: str, days: int = 60) -> Optional[pd.DataFrame]:
     """Fetch OHLCV data from Yahoo Finance (fallback)."""
-    end_date = date.today()
+    end_date = date.today() + timedelta(days=1)  # yf.download end is exclusive
     start_date = end_date - timedelta(days=days + 30)
 
     ticker = f"{stock_code}.KS"
@@ -209,136 +228,6 @@ def fetch_stock_data(stock_code: str, days: int = 60) -> Optional[pd.DataFrame]:
         return None
 
 
-# Realtime price cache (5-minute TTL)
-_realtime_cache: Dict[str, dict] = {}
-_realtime_cache_time: Dict[str, float] = {}
-_REALTIME_CACHE_TTL = 300  # 5 minutes
-
-
-def fetch_realtime_price(stock_code: str, use_cache: bool = True) -> Optional[Dict]:
-    """
-    Fetch real-time price from yfinance for a single stock.
-
-    Args:
-        stock_code: 6-digit stock code
-        use_cache: If True, use cached data within 5 minutes (default True)
-
-    Returns:
-        Dict with OHLCV data for today, or None if unavailable
-    """
-    import time
-
-    # Check cache first
-    if use_cache and stock_code in _realtime_cache:
-        cache_age = time.time() - _realtime_cache_time.get(stock_code, 0)
-        if cache_age < _REALTIME_CACHE_TTL:
-            logger.debug(f"{stock_code}: Using cached realtime price ({cache_age:.0f}s old)")
-            return _realtime_cache[stock_code]
-
-    ticker = f"{stock_code}.KS"
-    try:
-        stock = yf.Ticker(ticker)
-        # Try to get today's data
-        hist = stock.history(period="1d")
-
-        if hist.empty:
-            # Try KOSDAQ
-            ticker = f"{stock_code}.KQ"
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="1d")
-
-        if hist.empty:
-            return None
-
-        latest = hist.iloc[-1]
-        result = {
-            "date": hist.index[-1].date(),
-            "open": float(latest["Open"]),
-            "high": float(latest["High"]),
-            "low": float(latest["Low"]),
-            "close": float(latest["Close"]),
-            "volume": int(latest["Volume"]),
-        }
-
-        # Update cache
-        _realtime_cache[stock_code] = result
-        _realtime_cache_time[stock_code] = time.time()
-
-        return result
-    except Exception as e:
-        logger.debug(f"Realtime fetch failed for {stock_code}: {e}")
-        return None
-
-
-def is_market_open() -> bool:
-    """
-    Check if Korean stock market is currently open.
-
-    Market hours: 09:00 - 15:30 KST, weekdays only
-    """
-    from datetime import datetime
-    import pytz
-
-    try:
-        kst = pytz.timezone("Asia/Seoul")
-        now = datetime.now(kst)
-
-        # Weekday check (0=Monday, 6=Sunday)
-        if now.weekday() >= 5:  # Saturday or Sunday
-            return False
-
-        # Time check (09:00 - 15:30)
-        market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
-        market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
-
-        return market_open <= now <= market_close
-    except Exception:
-        return False
-
-
-def get_last_trading_date() -> date:
-    """
-    Get the most recent trading date.
-
-    If today is a weekday before market close, returns today.
-    Otherwise returns the previous trading day.
-    """
-    from datetime import datetime
-    import pytz
-
-    try:
-        kst = pytz.timezone("Asia/Seoul")
-        now = datetime.now(kst)
-        today = now.date()
-
-        # If weekend, go back to Friday
-        if now.weekday() == 5:  # Saturday
-            return today - timedelta(days=1)
-        elif now.weekday() == 6:  # Sunday
-            return today - timedelta(days=2)
-
-        # Weekday - if market hasn't opened yet, use previous day
-        market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
-        if now < market_open:
-            if now.weekday() == 0:  # Monday before open
-                return today - timedelta(days=3)  # Friday
-            return today - timedelta(days=1)
-
-        return today
-    except Exception:
-        return date.today()
-
-
-def _to_date(value) -> date:
-    """Convert various date formats to date object."""
-    if hasattr(value, 'date'):
-        return value.date()
-    elif isinstance(value, str):
-        return date.fromisoformat(value)
-    elif isinstance(value, date):
-        return value
-    else:
-        return pd.Timestamp(value).date()
 
 
 def calculate_indicators(
@@ -538,7 +427,6 @@ class SignalScanner:
         take_profit_pct: float = 12.0,
         take_profit_ratio: float = 1.0,
         sell_on_middle_band: bool = False,
-        use_cache: bool = True,
         # Bollinger Band parameters
         bollinger_period: int = 20,
         bollinger_std_dev: float = 2.0,
@@ -561,7 +449,6 @@ class SignalScanner:
         self.take_profit_pct = take_profit_pct
         self.take_profit_ratio = take_profit_ratio
         self.sell_on_middle_band = sell_on_middle_band
-        self.use_cache = use_cache
 
         # Bollinger Band parameters
         self.bollinger_period = bollinger_period
@@ -575,131 +462,111 @@ class SignalScanner:
         self.max_positions = max_positions
         self.max_position_pct = max_position_pct
 
-        self._cache: Dict[str, pd.DataFrame] = {}
-
-    def _load_cache(self) -> None:
-        """Load cache from disk if available (30 min TTL)."""
-        if not self._cache and self.use_cache:
-            try:
-                from src.wizard.data_cache import load_cache, is_cache_valid
-
-                # Use cache if valid within 30 minutes
-                if is_cache_valid(max_age_hours=0.5):
-                    self._cache = load_cache(max_age_hours=0.5, auto_refresh=False)
-                else:
-                    # Cache expired - don't load stale data, rely on DB
-                    logger.debug("Cache expired (>30min), using DB as primary source")
-            except Exception:
-                pass
-
-    def _get_stock_data(self, stock_code: str, force_realtime: bool = False) -> Optional[pd.DataFrame]:
+    def _get_stock_data(self, stock_code: str, force_fetch: bool = False) -> Optional[pd.DataFrame]:
         """
-        Get stock data with PostgreSQL-first caching strategy.
+        Get stock data with PostgreSQL + yfinance strategy.
 
-        Priority:
-        1. PostgreSQL DB (primary source)
-        2. Memory/disk cache (fallback if DB unavailable)
-        3. yfinance API full download (last resort)
-
-        Realtime data is only fetched when force_realtime=True (explicit refresh).
+        Strategy:
+        1. If force_fetch=True: Always fetch from yfinance and save to DB
+        2. Check DB for last_fetched_at
+        3. If last_fetched_at < 30 minutes: Use DB data
+        4. Otherwise: Fetch from yfinance and save to DB
 
         Args:
             stock_code: 6-digit stock code
-            force_realtime: If True, fetch realtime price for stale data
+            force_fetch: If True, always fetch from yfinance
 
         Returns:
             DataFrame with indicators or None
         """
-        # L1: PostgreSQL DB (primary source)
-        df = fetch_stock_data_from_db(stock_code)
-        if df is not None and len(df) >= 30:
-            # Only fetch realtime if explicitly requested
-            if force_realtime:
-                last_trading_day = get_last_trading_date()
-                db_latest_date = _to_date(df.index[-1])
+        from datetime import datetime
 
-                if db_latest_date < last_trading_day:
-                    logger.debug(f"{stock_code}: DB data stale ({db_latest_date}), fetching realtime...")
-                    realtime = fetch_realtime_price(stock_code)
+        # 1. force_fetch: Always fetch from yfinance
+        if force_fetch:
+            return self._fetch_and_save(stock_code)
 
-                    if realtime and realtime["date"] > db_latest_date:
-                        new_row = pd.DataFrame({
-                            "Open": [realtime["open"]],
-                            "High": [realtime["high"]],
-                            "Low": [realtime["low"]],
-                            "Close": [realtime["close"]],
-                            "Volume": [realtime["volume"]],
-                        }, index=[pd.Timestamp(realtime["date"])])
-                        df = pd.concat([df, new_row])
-                        logger.info(f"{stock_code}: Appended realtime price {realtime['close']:,.0f} ({realtime['date']})")
+        # 2. Check DB (includes last_fetched_at)
+        df, last_fetched_at = fetch_stock_data_from_db(stock_code)
 
-            df = calculate_indicators(
-                df,
-                bollinger_period=self.bollinger_period,
-                bollinger_std_dev=self.bollinger_std_dev,
-                squeeze_threshold_pct=self.squeeze_threshold_pct,
-                squeeze_lookback_days=self.squeeze_lookback_days,
-            )
-            # Update memory cache
-            self._cache[stock_code] = df.copy()
-            return df
+        # 3. If data exists and recently fetched (< 30 min), use DB data
+        if df is not None and len(df) >= 30 and last_fetched_at:
+            age_minutes = (datetime.now() - last_fetched_at).total_seconds() / 60
+            if age_minutes < FETCH_INTERVAL_MINUTES:
+                logger.debug(f"{stock_code}: Using DB data (fetched {age_minutes:.1f} min ago)")
+                return calculate_indicators(
+                    df,
+                    bollinger_period=self.bollinger_period,
+                    bollinger_std_dev=self.bollinger_std_dev,
+                    squeeze_threshold_pct=self.squeeze_threshold_pct,
+                    squeeze_lookback_days=self.squeeze_lookback_days,
+                )
 
-        # L2: Memory/disk cache (fallback if DB fails)
-        self._load_cache()
-        if stock_code in self._cache:
-            cached_df = self._cache[stock_code].copy()
+        # 4. Fetch from yfinance and save to DB
+        return self._fetch_and_save(stock_code)
 
-            # Only fetch realtime if explicitly requested
-            if force_realtime:
-                last_trading_day = get_last_trading_date()
-                cache_latest_date = _to_date(cached_df.index[-1])
+    def _fetch_and_save(self, stock_code: str) -> Optional[pd.DataFrame]:
+        """
+        Fetch stock data from yfinance and save to DB.
 
-                if cache_latest_date < last_trading_day:
-                    realtime = fetch_realtime_price(stock_code)
-                    if realtime and realtime["date"] > cache_latest_date:
-                        new_row = pd.DataFrame({
-                            "Open": [realtime["open"]],
-                            "High": [realtime["high"]],
-                            "Low": [realtime["low"]],
-                            "Close": [realtime["close"]],
-                            "Volume": [realtime["volume"]],
-                        }, index=[pd.Timestamp(realtime["date"])])
-                        cached_df = pd.concat([cached_df, new_row])
-                        logger.info(f"{stock_code}: Appended realtime to cache {realtime['close']:,.0f}")
+        Args:
+            stock_code: 6-digit stock code
 
-            # Recalculate indicators with user settings
-            cached_df = calculate_indicators(
-                cached_df,
-                bollinger_period=self.bollinger_period,
-                bollinger_std_dev=self.bollinger_std_dev,
-                squeeze_threshold_pct=self.squeeze_threshold_pct,
-                squeeze_lookback_days=self.squeeze_lookback_days,
-            )
-            logger.debug(f"{stock_code}: Using cache (DB unavailable)")
-            return cached_df
-
-        # L3: yfinance API (slow, 1-5s, last resort)
+        Returns:
+            DataFrame with indicators or None
+        """
         df = fetch_stock_data(stock_code)
-        if df is not None and len(df) >= 30:
-            df = calculate_indicators(
-                df,
-                bollinger_period=self.bollinger_period,
-                bollinger_std_dev=self.bollinger_std_dev,
-                squeeze_threshold_pct=self.squeeze_threshold_pct,
-                squeeze_lookback_days=self.squeeze_lookback_days,
-            )
-            # Update memory cache
-            self._cache[stock_code] = df.copy()
-            return df
+        if df is None or len(df) < 30:
+            return None
 
-        return None
+        # Save to DB with last_fetched_at
+        self._save_to_db(stock_code, df)
+
+        # Calculate indicators and return
+        return calculate_indicators(
+            df,
+            bollinger_period=self.bollinger_period,
+            bollinger_std_dev=self.bollinger_std_dev,
+            squeeze_threshold_pct=self.squeeze_threshold_pct,
+            squeeze_lookback_days=self.squeeze_lookback_days,
+        )
+
+    def _save_to_db(self, stock_code: str, df: pd.DataFrame) -> None:
+        """
+        Save price data to historical_prices table.
+
+        Args:
+            stock_code: 6-digit stock code
+            df: DataFrame with OHLCV data
+        """
+        from src.services.price_updater import save_closing_price, get_db_engine
+
+        engine = get_db_engine()
+        if engine is None:
+            logger.warning(f"{stock_code}: Failed to get DB engine, skipping save")
+            return
+
+        saved_count = 0
+        for idx in df.index:
+            row = df.loc[idx]
+            price_data = {
+                "date": idx.date() if hasattr(idx, 'date') else idx,
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
+                "volume": int(row["Volume"]),
+            }
+            if save_closing_price(stock_code, price_data, engine):
+                saved_count += 1
+
+        logger.info(f"{stock_code}: Saved {saved_count} price records to DB")
 
     def scan_for_buy_signals(
         self,
         stock_codes: List[str],
         existing_positions: Optional[List[str]] = None,
         max_results: int = 10,
-        force_realtime: bool = False,
+        force_fetch: bool = False,
     ) -> List[StockSignal]:
         """Scan for BUY signals on stocks without positions.
 
@@ -707,14 +574,14 @@ class SignalScanner:
             stock_codes: List of stock codes to scan
             existing_positions: Stock codes to exclude (already held)
             max_results: Maximum signals to return
-            force_realtime: If True, fetch realtime prices for stale data
+            force_fetch: If True, always fetch from yfinance and save to DB
         """
         signals = []
         existing = existing_positions or []
         candidates = [s for s in stock_codes if s not in existing]
 
         for stock_code in candidates:
-            df = self._get_stock_data(stock_code, force_realtime=force_realtime)
+            df = self._get_stock_data(stock_code, force_fetch=force_fetch)
             if df is None or len(df) < 35:
                 continue
             latest = df.iloc[-1]

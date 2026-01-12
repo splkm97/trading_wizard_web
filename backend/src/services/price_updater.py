@@ -75,6 +75,7 @@ def save_closing_price(
     Save closing price to historical_prices table.
 
     Uses UPSERT (INSERT ... ON CONFLICT DO UPDATE) for idempotency.
+    Updates last_fetched_at timestamp for rate limiting.
 
     Args:
         stock_code: 6-digit stock code
@@ -84,6 +85,8 @@ def save_closing_price(
     Returns:
         True if saved successfully
     """
+    from datetime import datetime
+
     if engine is None:
         engine = get_db_engine()
         if engine is None:
@@ -91,23 +94,25 @@ def save_closing_price(
 
     # Check if using PostgreSQL or SQLite
     is_postgres = "postgresql" in str(engine.url)
+    now = datetime.now()
 
     if is_postgres:
         query = text("""
-            INSERT INTO historical_prices (stock_code, date, open, high, low, close, volume)
-            VALUES (:stock_code, :date, :open, :high, :low, :close, :volume)
+            INSERT INTO historical_prices (stock_code, date, open, high, low, close, volume, last_fetched_at)
+            VALUES (:stock_code, :date, :open, :high, :low, :close, :volume, :last_fetched_at)
             ON CONFLICT (stock_code, date) DO UPDATE SET
                 open = EXCLUDED.open,
                 high = EXCLUDED.high,
                 low = EXCLUDED.low,
                 close = EXCLUDED.close,
-                volume = EXCLUDED.volume
+                volume = EXCLUDED.volume,
+                last_fetched_at = EXCLUDED.last_fetched_at
         """)
     else:
         # SQLite uses INSERT OR REPLACE
         query = text("""
-            INSERT OR REPLACE INTO historical_prices (stock_code, date, open, high, low, close, volume)
-            VALUES (:stock_code, :date, :open, :high, :low, :close, :volume)
+            INSERT OR REPLACE INTO historical_prices (stock_code, date, open, high, low, close, volume, last_fetched_at)
+            VALUES (:stock_code, :date, :open, :high, :low, :close, :volume, :last_fetched_at)
         """)
 
     try:
@@ -120,6 +125,7 @@ def save_closing_price(
                 "low": price_data["low"],
                 "close": price_data["close"],
                 "volume": price_data["volume"],
+                "last_fetched_at": now,
             })
         return True
     except Exception as e:

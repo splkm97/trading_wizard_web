@@ -1,6 +1,6 @@
 """Historical stock price data model."""
 
-from sqlalchemy import Column, String, Float, BigInteger, Index
+from sqlalchemy import Column, String, Float, BigInteger, DateTime, Index
 
 from src.db.database import Base
 
@@ -17,6 +17,7 @@ class HistoricalPrice(Base):
     low = Column(Float, nullable=False)
     close = Column(Float, nullable=False)
     volume = Column(BigInteger, nullable=False)
+    last_fetched_at = Column(DateTime, nullable=True)  # yfinance fetch timestamp
 
     __table_args__ = (
         Index("ix_historical_prices_date", "date"),

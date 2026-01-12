@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -20,7 +20,6 @@ from src.wizard.recommendation import (
     format_buy_reason_detail,
     format_signal_reason_detail,
 )
-from src.wizard.data_cache import refresh_cache, get_cache_info, is_cache_valid
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -119,8 +118,7 @@ class RecommendationsResponse(BaseModel):
 async def get_recommendations(
     max_results: int = Query(default=5, ge=1, le=20),
     confidence_threshold: int = Query(default=60, ge=0, le=100),
-    force_refresh: bool = Query(default=False, description="Force refresh cache"),
-    refresh: bool = Query(default=False, description="Fetch realtime prices for stale data"),
+    force_fetch: bool = Query(default=False, description="Force fetch from yfinance and save to DB"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -130,17 +128,10 @@ async def get_recommendations(
     This endpoint scans the KOSPI Top 100 stocks and returns
     buy recommendations based on the Bollinger Band Squeeze strategy.
 
-    - refresh=true: Fetch realtime prices from yfinance for stocks with stale DB data
-    - force_refresh=true: Refresh entire cache (slower, downloads all data)
+    Data source:
+    - Default: Uses DB data if fetched within 30 minutes, otherwise fetches from yfinance
+    - force_fetch=true: Always fetch from yfinance and save to DB
     """
-    # Force refresh cache if requested
-    if force_refresh:
-        try:
-            from src.wizard.data_cache import refresh_cache
-            refresh_cache()
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Cache refresh failed: {e}")
     # Get user's portfolio to check existing positions
     portfolio = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).first()
 
@@ -209,7 +200,7 @@ async def get_recommendations(
         stock_codes=stock_codes,
         existing_positions=existing_positions,
         max_results=max_results * 2,  # Get more signals for filtering
-        force_realtime=refresh,  # Fetch realtime prices only when explicitly requested
+        force_fetch=force_fetch,
     )
 
     # Generate recommendations with position sizing from user settings
@@ -367,50 +358,3 @@ async def get_stock_signal(
     )
 
 
-class CacheStatusResponse(BaseModel):
-    cached: bool
-    valid: bool
-    timestamp: Optional[str] = None
-    stock_count: Optional[int] = None
-
-
-class CacheRefreshResponse(BaseModel):
-    status: str
-    message: str
-
-
-@router.get("/cache/status", response_model=CacheStatusResponse)
-async def get_cache_status(
-    current_user: User = Depends(get_current_user),
-):
-    """Get current cache status."""
-    info = get_cache_info()
-
-    if info:
-        return CacheStatusResponse(
-            cached=True,
-            valid=is_cache_valid(max_age_hours=24),
-            timestamp=info.get("timestamp"),
-            stock_count=info.get("stock_count"),
-        )
-
-    return CacheStatusResponse(cached=False, valid=False)
-
-
-@router.post("/cache/refresh", response_model=CacheRefreshResponse)
-async def refresh_stock_cache(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Refresh stock data cache in background.
-
-    Downloads KOSPI Top 100 stock data and caches locally.
-    Takes about 10-20 seconds.
-    """
-    background_tasks.add_task(refresh_cache)
-
-    return CacheRefreshResponse(
-        status="started",
-        message="Cache refresh started in background. Check /cache/status for progress.",
-    )

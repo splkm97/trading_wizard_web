@@ -73,13 +73,13 @@ export default function RecommendationsPanel({
   const [showAllSignals, setShowAllSignals] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  const fetchRecommendations = async (forceRefresh: boolean = false) => {
+  const fetchRecommendations = async (forceFetch: boolean = false) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const url = forceRefresh
-        ? '/recommendations?max_results=5&force_refresh=true'
+      const url = forceFetch
+        ? '/recommendations?max_results=5&force_fetch=true'
         : '/recommendations?max_results=5';
       const response = await api.get<RecommendationsResponse>(url);
       setBuyRecs(response.buy_recommendations);
@@ -138,7 +138,7 @@ export default function RecommendationsPanel({
           <div className="h-20 bg-gray-200 rounded" />
         </div>
         <p className="text-sm text-gray-500 mt-3">
-          KOSPI Top 100 스캔 중... (캐시 사용 시 1초 이내)
+          KOSPI Top 100 스캔 중...
         </p>
       </Card>
     );
@@ -266,7 +266,7 @@ export default function RecommendationsPanel({
           <button
             onClick={() => fetchRecommendations(true)}
             className="text-blue-600 hover:text-blue-800"
-            title="캐시 무시하고 최신 데이터로 새로고침"
+            title="yfinance에서 최신 데이터 가져오기"
           >
             🔄 새로고침
           </button>

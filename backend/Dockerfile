@@ -22,9 +22,6 @@ COPY scripts/ ./scripts/
 # Copy data files (kospi_top100.txt, stock_names_kr.json)
 COPY data/ ./data/
 
-# Copy cache files to separate directory (pre-built stock data cache)
-COPY data/cache/ ./cache/
-
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
