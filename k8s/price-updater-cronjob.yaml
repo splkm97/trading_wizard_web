@@ -1,0 +1,247 @@
+# Trading Wizard Web - Price Updater CronJob
+# 5분마다 historical_prices 테이블 업데이트
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: price-updater
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+    component: price-updater
+spec:
+  # 5분마다 실행 (장중에만 의미 있음: 09:00-15:30 KST)
+  schedule: "*/5 * * * *"
+  # 동시 실행 방지
+  concurrencyPolicy: Forbid
+  # 실패한 Job 기록 유지 개수
+  failedJobsHistoryLimit: 3
+  # 성공한 Job 기록 유지 개수
+  successfulJobsHistoryLimit: 3
+  # Job 시작 데드라인 (초) - 스케줄 시간 후 200초 내 시작 못하면 스킵
+  startingDeadlineSeconds: 200
+  jobTemplate:
+    spec:
+      # Job 실패 시 재시도 횟수
+      backoffLimit: 2
+      # Job 최대 실행 시간 (5분 = 300초)
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            app: trading-wizard
+            component: price-updater
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: price-updater
+              image: splkm97/trading-wizard-backend:latest
+              imagePullPolicy: Always
+              command:
+                - python
+                - -c
+                - |
+                  import sys
+                  sys.path.insert(0, '/app')
+
+                  from src.services.price_updater import update_all_closing_prices
+                  from src.wizard.signal_scanner import load_kospi_top100
+
+                  import pytz
+                  from datetime import datetime
+
+                  kst = pytz.timezone('Asia/Seoul')
+                  now = datetime.now(kst)
+
+                  # 주말 스킵
+                  if now.weekday() >= 5:
+                      print(f"[{now}] Weekend - skipping price update")
+                      sys.exit(0)
+
+                  # 장중 시간 체크 (09:00 - 15:40 KST)
+                  market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
+                  market_close = now.replace(hour=15, minute=40, second=0, microsecond=0)
+
+                  if not (market_open <= now <= market_close):
+                      print(f"[{now}] Outside market hours (09:00-15:40 KST) - skipping")
+                      sys.exit(0)
+
+                  print(f"[{now}] Starting price update...")
+
+                  # KOSPI Top 100 종목 업데이트
+                  try:
+                      stock_codes = load_kospi_top100()
+                      print(f"Updating {len(stock_codes)} stocks...")
+                      result = update_all_closing_prices(stock_codes)
+                      print(f"Result: {result}")
+                  except Exception as e:
+                      print(f"Error: {e}")
+                      sys.exit(1)
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: backend-secrets
+                      key: DATABASE_URL
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+
+---
+# 장 마감 후 종가 업데이트 CronJob (15:40 KST = 06:40 UTC)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: price-updater-daily
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+    component: price-updater-daily
+spec:
+  # 장 마감 후 15:40 KST (06:40 UTC) 실행
+  schedule: "40 6 * * 1-5"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 5
+  successfulJobsHistoryLimit: 5
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      # 일일 업데이트는 더 긴 시간 허용 (10분)
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app: trading-wizard
+            component: price-updater-daily
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: price-updater-daily
+              image: splkm97/trading-wizard-backend:latest
+              imagePullPolicy: Always
+              command:
+                - python
+                - -c
+                - |
+                  import sys
+                  sys.path.insert(0, '/app')
+
+                  from src.services.price_updater import scheduled_price_update
+
+                  import pytz
+                  from datetime import datetime
+
+                  kst = pytz.timezone('Asia/Seoul')
+                  now = datetime.now(kst)
+
+                  print(f"[{now}] Running daily scheduled price update...")
+                  scheduled_price_update()
+                  print(f"[{now}] Daily price update completed")
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: backend-secrets
+                      key: DATABASE_URL
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "200m"
+                limits:
+                  memory: "1Gi"
+                  cpu: "1000m"
+
+---
+# 신호 사전계산 CronJob (1분마다 실행)
+# 캐시에 Bollinger/Contrarian 신호 저장 → API 응답 속도 향상
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: signal-precomputer
+  namespace: trading-wizard
+  labels:
+    app: trading-wizard
+    component: signal-precomputer
+spec:
+  # 1분마다 실행
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  startingDeadlineSeconds: 50
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 55
+      template:
+        metadata:
+          labels:
+            app: trading-wizard
+            component: signal-precomputer
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: signal-precomputer
+              image: splkm97/trading-wizard-backend:latest
+              imagePullPolicy: Always
+              command:
+                - python
+                - -c
+                - |
+                  import sys
+                  sys.path.insert(0, '/app')
+
+                  import pytz
+                  from datetime import datetime
+
+                  kst = pytz.timezone('Asia/Seoul')
+                  now = datetime.now(kst)
+
+                  # 주말 스킵
+                  if now.weekday() >= 5:
+                      print(f"[{now}] Weekend - skipping signal precompute")
+                      sys.exit(0)
+
+                  # 장중 시간 체크 (08:50 - 15:35 KST)
+                  market_open = now.replace(hour=8, minute=50, second=0, microsecond=0)
+                  market_close = now.replace(hour=15, minute=35, second=0, microsecond=0)
+
+                  if not (market_open <= now <= market_close):
+                      print(f"[{now}] Outside market hours (08:50-15:35 KST) - skipping")
+                      sys.exit(0)
+
+                  print(f"[{now}] Starting signal precompute...")
+
+                  from src.services.signal_precomputer import precompute_all_signals
+
+                  try:
+                      result = precompute_all_signals(force_fetch=False)
+                      print(f"Result: {result}")
+                  except Exception as e:
+                      print(f"Error: {e}")
+                      sys.exit(1)
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: backend-secrets
+                      key: DATABASE_URL
+                - name: REDIS_URL
+                  value: "redis://redis.trading-wizard.svc.cluster.local:6379/0"
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"

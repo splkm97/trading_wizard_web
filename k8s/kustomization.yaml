@@ -12,6 +12,7 @@ resources:
   - backend-deployment.yaml
   - frontend-deployment.yaml
   - ingress.yaml
+  - price-updater-cronjob.yaml
   # Istio resources (requires Istio to be installed on cluster)
   # - istio-gateway.yaml
   # - istio-virtualservice.yaml
