@@ -5,7 +5,6 @@ import { Button } from './Button';
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: '대시보드' },
-  { path: '/watchlist', label: '관심 종목' },
   { path: '/contrarian', label: 'MACD/RSI 역추세' },
   { path: '/simulation', label: '시뮬레이션' },
   { path: '/backtest', label: '백테스트' },
