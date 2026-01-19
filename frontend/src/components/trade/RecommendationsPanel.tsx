@@ -23,17 +23,6 @@ interface BuyRecommendation {
   };
 }
 
-interface SellRecommendation {
-  stock_code: string;
-  stock_name: string;
-  current_price: number;
-  quantity: number;
-  entry_price: number;
-  pnl_pct: number;
-  reason: string;
-  indicators: Record<string, number>;
-}
-
 interface BuySignal {
   stock_code: string;
   stock_name: string;
@@ -47,7 +36,6 @@ interface BuySignal {
 
 interface RecommendationsResponse {
   buy_recommendations: BuyRecommendation[];
-  sell_recommendations: SellRecommendation[];
   all_buy_signals: BuySignal[];
   scanned_count: number;
   signal_count: number;
@@ -56,7 +44,6 @@ interface RecommendationsResponse {
 
 export default function RecommendationsPanel() {
   const [buyRecs, setBuyRecs] = useState<BuyRecommendation[]>([]);
-  const [sellRecs, setSellRecs] = useState<SellRecommendation[]>([]);
   const [allBuySignals, setAllBuySignals] = useState<BuySignal[]>([]);
   const [appliedSettings, setAppliedSettings] = useState<AppliedSettings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,7 +74,6 @@ export default function RecommendationsPanel() {
         : '/recommendations?max_results=5';
       const response = await api.get<RecommendationsResponse>(url);
       setBuyRecs(response.buy_recommendations);
-      setSellRecs(response.sell_recommendations);
       setAllBuySignals(response.all_buy_signals || []);
       setScannedCount(response.scanned_count);
       setAppliedSettings(response.applied_settings);
@@ -134,12 +120,6 @@ export default function RecommendationsPanel() {
     if (score >= 80) return 'bg-green-100';
     if (score >= 60) return 'bg-yellow-100';
     return 'bg-gray-100';
-  };
-
-  const getPnLColor = (pnl: number) => {
-    if (pnl > 0) return 'text-red-600';
-    if (pnl < 0) return 'text-blue-600';
-    return 'text-gray-600';
   };
 
   const handleAddToWatchlist = async (e: React.MouseEvent, stockCode: string, stockName: string) => {
@@ -433,48 +413,6 @@ export default function RecommendationsPanel() {
             ))}
           </div>
         )}
-
-        {/* SELL Recommendations - Priority */}
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-blue-700 flex items-center gap-1">
-            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">
-              매도
-            </span>
-            보유 종목 신호
-          </h3>
-          {sellRecs.length === 0 ? (
-            <div className="text-center py-3 text-gray-500 text-sm border border-dashed border-gray-300 rounded-lg">
-              <p>매도 신호가 없습니다. 보유 종목이 안정적입니다.</p>
-            </div>
-          ) : (
-            sellRecs.map((rec) => (
-              <div
-                key={rec.stock_code}
-                className="border border-blue-200 rounded-lg p-3 bg-blue-50"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{rec.stock_name}</span>
-                      <span className="text-xs text-gray-500">{rec.stock_code}</span>
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {rec.quantity}주 @ {formatKRW(rec.entry_price)}원 →{' '}
-                      {formatKRW(rec.current_price)}원
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className={`font-semibold ${getPnLColor(rec.pnl_pct)}`}>
-                      {rec.pnl_pct > 0 ? '+' : ''}
-                      {rec.pnl_pct.toFixed(1)}%
-                    </div>
-                    <div className="text-xs text-gray-500">{rec.reason}</div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
 
         {/* BUY Recommendations */}
         <div className="space-y-2">
