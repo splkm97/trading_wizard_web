@@ -9,7 +9,7 @@ from src.db.database import Base
 from src.core.config import settings
 
 # Import all models to register them
-from src.models import user, user_settings, portfolio, position, trade, backtest  # noqa: F401
+from src.models import user, user_settings, backtest, game_session  # noqa: F401
 
 config = context.config
 

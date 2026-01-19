@@ -230,28 +230,10 @@ class BacktestService:
         return result
 
     def _load_stock_list(self, stock_list_name: str, user_id: str) -> list[str]:
-        """Load stock list from database or file.
+        """Load stock list from file.
 
-        First checks if stock_list_name is a custom list ID or name,
-        then falls back to file-based lists.
+        StockList model has been replaced by Watchlist, so we only support file-based lists.
         """
-        # Try to load from database first (by ID or name)
-        from sqlalchemy import or_
-
-        from src.models.stock_list import StockList
-
-        stock_list = (
-            self.db.query(StockList)
-            .filter(
-                or_(StockList.user_id == user_id, StockList.is_default == True),  # noqa: E712
-                or_(StockList.id == stock_list_name, StockList.name == stock_list_name),
-            )
-            .first()
-        )
-
-        if stock_list:
-            return stock_list.get_stock_codes_list()[:100]
-
         # Fall back to file-based stock lists
         filename = f"{stock_list_name}.txt"
         possible_paths = [

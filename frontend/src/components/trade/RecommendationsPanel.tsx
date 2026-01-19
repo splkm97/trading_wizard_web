@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '../common';
-import { api } from '../../services/api';
+import { api, addToWatchlist } from '../../services/api';
 import { AppliedSettings } from '../../types';
 
 interface BuyRecommendation {
@@ -54,13 +54,7 @@ interface RecommendationsResponse {
   applied_settings: AppliedSettings;
 }
 
-interface RecommendationsPanelProps {
-  onSelectRecommendation?: (rec: BuyRecommendation) => void;
-}
-
-export default function RecommendationsPanel({
-  onSelectRecommendation,
-}: RecommendationsPanelProps) {
+export default function RecommendationsPanel() {
   const [buyRecs, setBuyRecs] = useState<BuyRecommendation[]>([]);
   const [sellRecs, setSellRecs] = useState<SellRecommendation[]>([]);
   const [allBuySignals, setAllBuySignals] = useState<BuySignal[]>([]);
@@ -72,10 +66,20 @@ export default function RecommendationsPanel({
   const [expandedSignalIndex, setExpandedSignalIndex] = useState<number | null>(null);
   const [showAllSignals, setShowAllSignals] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [loadingTime, setLoadingTime] = useState(0);
+  const [isForceFetch, setIsForceFetch] = useState(false);
+  const loadingTimerRef = useRef<number | null>(null);
 
   const fetchRecommendations = async (forceFetch: boolean = false) => {
     setIsLoading(true);
     setError(null);
+    setLoadingTime(0);
+    setIsForceFetch(forceFetch);
+
+    // Start loading timer
+    loadingTimerRef.current = window.setInterval(() => {
+      setLoadingTime((prev) => prev + 1);
+    }, 1000);
 
     try {
       const url = forceFetch
@@ -91,9 +95,24 @@ export default function RecommendationsPanel({
       setError('추천 데이터를 불러오는데 실패했습니다.');
       console.error('Failed to fetch recommendations:', err);
     } finally {
+      // Clear loading timer
+      if (loadingTimerRef.current) {
+        clearInterval(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
       setIsLoading(false);
+      setIsForceFetch(false);
     }
   };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingTimerRef.current) {
+        clearInterval(loadingTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchRecommendations();
@@ -123,23 +142,94 @@ export default function RecommendationsPanel({
     return 'text-gray-600';
   };
 
-  const handleSelect = (rec: BuyRecommendation) => {
-    if (onSelectRecommendation) {
-      onSelectRecommendation(rec);
+  const handleAddToWatchlist = async (e: React.MouseEvent, stockCode: string, stockName: string) => {
+    e.stopPropagation();
+    try {
+      await addToWatchlist({ stock_code: stockCode, stock_name: stockName });
+      alert('관심 종목에 등록되었습니다.');
+    } catch (error) {
+      console.error('Failed to add to watchlist:', error);
+      alert('관심 종목 등록에 실패했습니다.');
     }
   };
 
   if (isLoading) {
+    // Loading messages based on elapsed time
+    const getLoadingMessage = () => {
+      if (isForceFetch) {
+        if (loadingTime < 5) return 'yfinance에서 최신 데이터를 가져오는 중...';
+        if (loadingTime < 15) return `실시간 데이터 수집 중... (${loadingTime}초)`;
+        if (loadingTime < 30) return `100개 종목 분석 중... (${loadingTime}초) - 잠시만 기다려주세요`;
+        return `데이터 처리 중... (${loadingTime}초) - 네트워크 상태에 따라 시간이 걸릴 수 있습니다`;
+      }
+      if (loadingTime < 3) return 'KOSPI Top 100 스캔 중...';
+      if (loadingTime < 10) return `캐시 데이터 확인 중... (${loadingTime}초)`;
+      if (loadingTime < 20) return `데이터베이스에서 조회 중... (${loadingTime}초)`;
+      return `실시간 데이터 수집 중... (${loadingTime}초) - 캐시가 만료되어 새로 가져오는 중입니다`;
+    };
+
+    const getLoadingStatus = () => {
+      if (loadingTime < 5) return { color: 'text-blue-600', bg: 'bg-blue-100' };
+      if (loadingTime < 15) return { color: 'text-yellow-600', bg: 'bg-yellow-100' };
+      return { color: 'text-orange-600', bg: 'bg-orange-100' };
+    };
+
+    const status = getLoadingStatus();
+
     return (
       <Card title="Daily Wizard 추천">
-        <div className="animate-pulse space-y-3">
-          <div className="h-4 bg-gray-200 rounded w-3/4" />
-          <div className="h-20 bg-gray-200 rounded" />
-          <div className="h-20 bg-gray-200 rounded" />
+        <div className="space-y-4">
+          {/* Progress indicator */}
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent" />
+            <span className={`text-sm font-medium ${status.color}`}>
+              {getLoadingMessage()}
+            </span>
+          </div>
+
+          {/* Progress bar for force fetch */}
+          {isForceFetch && (
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-1000"
+                style={{ width: `${Math.min(loadingTime * 2, 95)}%` }}
+              />
+            </div>
+          )}
+
+          {/* Skeleton UI */}
+          <div className="animate-pulse space-y-3">
+            <div className="h-4 bg-gray-200 rounded w-3/4" />
+            <div className="h-20 bg-gray-200 rounded" />
+            <div className="h-20 bg-gray-200 rounded" />
+          </div>
+
+          {/* Extended loading notice */}
+          {loadingTime >= 10 && (
+            <div className={`p-3 rounded-lg ${status.bg} border`}>
+              <p className={`text-sm ${status.color}`}>
+                {loadingTime >= 20 ? (
+                  <>
+                    <strong>알림:</strong> 캐시된 데이터가 없거나 만료되어 실시간 데이터를 수집하고 있습니다.
+                    최초 로딩 시 또는 장중에는 시간이 더 걸릴 수 있습니다.
+                  </>
+                ) : (
+                  <>
+                    <strong>안내:</strong> 데이터를 준비하고 있습니다. 잠시만 기다려주세요.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Loading time indicator */}
+          {loadingTime >= 5 && (
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>경과 시간: {loadingTime}초</span>
+              <span>예상 소요: {isForceFetch ? '30-60초' : '5-10초'}</span>
+            </div>
+          )}
         </div>
-        <p className="text-sm text-gray-500 mt-3">
-          KOSPI Top 100 스캔 중...
-        </p>
       </Card>
     );
   }
@@ -426,20 +516,20 @@ export default function RecommendationsPanel({
                       {formatKRW(rec.total_cost)}원
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelect(rec);
-                      }}
-                      className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                    >
-                      선택
-                    </button>
-                    <span className="text-gray-400">
-                      {expandedBuyIndex === index ? '▲' : '▼'}
-                    </span>
-                  </div>
+                   <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToWatchlist(e, rec.stock_code, rec.stock_name);
+                        }}
+                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                      >
+                        관심 종목 등록
+                      </button>
+                     <span className="text-gray-400">
+                       {expandedBuyIndex === index ? '▲' : '▼'}
+                     </span>
+                   </div>
                 </div>
 
                 {expandedBuyIndex === index && (

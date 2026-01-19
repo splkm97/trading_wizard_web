@@ -30,6 +30,13 @@ def get_db():
 def init_db():
     """Initialize database tables."""
     # Import all models to register them with Base
-    from src.models import user, portfolio, position, trade, backtest, user_settings  # noqa: F401
+    from src.models import (
+        user,
+        backtest,
+        user_settings,
+        game_session,
+        historical_price,
+        watchlist,
+    )  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

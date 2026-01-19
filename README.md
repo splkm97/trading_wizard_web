@@ -15,14 +15,14 @@
 ### 1. 매매 신호 스캐닝
 
 - **실시간 BUY 신호**: KOSPI/KOSDAQ 종목 중 Squeeze 돌파 종목 탐지
-- **SELL 신호**: 보유 포지션 대상 손절/익절/중간밴드 이탈 신호
+- **SELL 신호**: 관심종목 대상 손절/익절/중간밴드 이탈 신호
 - **신뢰도 스코어링**: 0-100점 다단계 평가 시스템
 
-### 2. 포트폴리오 관리
+### 2. 관심종목 관리 (Watchlist)
 
-- 다중 포트폴리오 생성 및 관리
-- 포지션별 수익률 추적
-- 거래 이력 조회
+- 관심 종목 추가 및 관리
+- 자동 인사이트 업데이트 (일일 추천 정보와 연동)
+- 종목별 기술적 지표 및 신호 모니터링
 
 ### 3. 백테스팅
 
@@ -76,9 +76,11 @@ Base Score    25점  (Bollinger Squeeze 돌파 - 항상 부여)
 3. 신뢰도 점수 >= 임계값 (기본 55점)
 
 **SELL 신호 조건**
-- 손절매: 진입가 대비 -4.5% (설정 가능)
-- 익절매: 진입가 대비 +12.0% (설정 가능)
+- 손절매: 기준가 대비 -4.5% (설정 가능)
+- 익절매: 기준가 대비 +12.0% (설정 가능)
 - 중간밴드 이탈: 가격이 중간 밴드 하향 돌파 (선택적)
+
+> **참고**: 이 시스템은 매매 신호를 제공하는 것이며, 실제 매매는 사용자가 직접 수행해야 합니다. 포지션 추적이나 자동 매매 기능은 제공하지 않습니다.
 
 ## 프로젝트 구조
 
@@ -91,11 +93,8 @@ trading_wizard_web/
 │   │   ├── main.py            # 애플리케이션 진입점
 │   │   ├── api/               # API 라우터
 │   │   │   ├── auth.py        # 인증 API
-│   │   │   ├── portfolio.py   # 포트폴리오 관리
-│   │   │   ├── positions.py   # 포지션 관리
-│   │   │   ├── trades.py      # 거래 기록
+│   │   │   ├── watchlists.py  # 관심종목 관리
 │   │   │   ├── stocks.py      # 종목 정보
-│   │   │   ├── stock_lists.py # 관심 종목 리스트
 │   │   │   ├── recommendations.py  # 매매 추천
 │   │   │   ├── backtest.py    # 백테스팅
 │   │   │   ├── settings.py    # 사용자 설정
@@ -107,9 +106,7 @@ trading_wizard_web/
 │   │   │   └── config.py      # 설정 관리
 │   │   ├── models/            # 데이터 모델 (SQLAlchemy)
 │   │   │   ├── user.py        # 사용자
-│   │   │   ├── portfolio.py   # 포트폴리오
-│   │   │   ├── position.py    # 포지션
-│   │   │   ├── trade.py       # 거래
+│   │   │   ├── watchlist.py   # 관심종목
 │   │   │   └── user_settings.py  # 사용자 설정
 │   │   ├── services/          # 서비스 레이어
 │   │   ├── auth/              # 인증 (JWT)
@@ -209,33 +206,6 @@ curl http://localhost:8000/api/health
 | POST | `/api/auth/login` | 로그인 (JWT 발급) |
 | GET | `/api/auth/me` | 현재 사용자 정보 |
 
-### Portfolio (포트폴리오)
-
-| Method | Endpoint | 설명 |
-|--------|----------|------|
-| GET | `/api/portfolios` | 포트폴리오 목록 |
-| POST | `/api/portfolios` | 포트폴리오 생성 |
-| GET | `/api/portfolios/{id}` | 포트폴리오 상세 |
-| PUT | `/api/portfolios/{id}` | 포트폴리오 수정 |
-| DELETE | `/api/portfolios/{id}` | 포트폴리오 삭제 |
-
-### Positions (포지션)
-
-| Method | Endpoint | 설명 |
-|--------|----------|------|
-| GET | `/api/positions` | 보유 포지션 목록 |
-| POST | `/api/positions` | 포지션 추가 |
-| PUT | `/api/positions/{id}` | 포지션 수정 |
-| DELETE | `/api/positions/{id}` | 포지션 삭제 |
-
-### Trades (거래)
-
-| Method | Endpoint | 설명 |
-|--------|----------|------|
-| GET | `/api/trades` | 거래 이력 조회 |
-| POST | `/api/trades` | 거래 기록 추가 |
-| GET | `/api/trades/{id}` | 거래 상세 |
-
 ### Stocks (종목)
 
 | Method | Endpoint | 설명 |
@@ -244,14 +214,13 @@ curl http://localhost:8000/api/health
 | GET | `/api/stocks/{code}` | 종목 상세 정보 |
 | GET | `/api/stocks/{code}/price` | 현재가 조회 |
 
-### Stock Lists (관심종목)
+### Watchlists (관심종목)
 
 | Method | Endpoint | 설명 |
 |--------|----------|------|
-| GET | `/api/stock-lists` | 관심종목 리스트 |
-| POST | `/api/stock-lists` | 리스트 생성 |
-| PUT | `/api/stock-lists/{id}` | 리스트 수정 |
-| DELETE | `/api/stock-lists/{id}` | 리스트 삭제 |
+| GET | `/api/watchlists` | 관심종목 리스트 조회 |
+| POST | `/api/watchlists` | 관심종목 리스트 생성 |
+| DELETE | `/api/watchlists/{id}` | 관심종목 리스트 삭제 |
 
 ### Recommendations (매매 추천)
 

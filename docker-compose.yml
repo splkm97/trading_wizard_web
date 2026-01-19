@@ -30,7 +30,7 @@ services:
       - JWT_EXPIRE_MINUTES=30
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
     volumes:
-      - ./backend/src:/app/src:ro
+      - ./backend/src:/app/src:rw
     depends_on:
       db:
         condition: service_healthy

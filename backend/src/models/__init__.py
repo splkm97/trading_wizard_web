@@ -2,11 +2,7 @@
 from src.models.base import BaseModel
 from src.models.user import User
 from src.models.user_settings import UserSettings
-from src.models.portfolio import Portfolio
-from src.models.position import Position
-from src.models.trade import Trade, TradeAction
 from src.models.backtest import BacktestResult
-from src.models.stock_list import StockList
 from src.models.game_session import (
     GameSession,
     GameStatus,
@@ -15,21 +11,18 @@ from src.models.game_session import (
     SimulatedTradeAction,
 )
 from src.models.historical_price import HistoricalPrice
+from src.models.watchlist import Watchlist
 
 __all__ = [
     "BaseModel",
     "User",
     "UserSettings",
-    "Portfolio",
-    "Position",
-    "Trade",
-    "TradeAction",
     "BacktestResult",
-    "StockList",
     "GameSession",
     "GameStatus",
     "SimulatedPosition",
     "SimulatedTrade",
     "SimulatedTradeAction",
     "HistoricalPrice",
+    "Watchlist",
 ]

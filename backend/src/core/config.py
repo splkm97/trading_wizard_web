@@ -1,5 +1,7 @@
 """Application configuration using Pydantic Settings."""
 
+from __future__ import annotations
+
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,6 +29,12 @@ class Settings(BaseSettings):
 
     # Logging
     LOG_LEVEL: str = "INFO"
+
+    # Redis Cache
+    REDIS_URL: str | None = None  # Optional: redis://localhost:6379/0
+    SIGNAL_CACHE_TTL_SECONDS: int = 300  # 5 minutes (extended for stale-while-revalidate)
+    SIGNAL_STALE_THRESHOLD_SECONDS: int = 60  # Consider stale after 1 minute
+    PRICE_CACHE_TTL_SECONDS: int = 30  # 30 seconds
 
     @property
     def cors_origins_list(self) -> list[str]:

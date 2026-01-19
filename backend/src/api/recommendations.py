@@ -2,24 +2,28 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+import logging
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.auth.middleware import get_current_user
 from src.db.database import get_db
 from src.models.user import User
-from src.models.portfolio import Portfolio
 from src.models.user_settings import UserSettings
-from src.wizard.signal_scanner import SignalScanner, load_kospi_top100, StockSignal
+from src.services.signal_precomputer import (
+    get_cached_signals_with_staleness,
+    precompute_all_signals,
+)
 from src.wizard.recommendation import (
     RecommendationEngine,
-    BuyRecommendation,
     format_buy_reason_detail,
     format_signal_reason_detail,
 )
+from src.wizard.signal_scanner import SignalScanner, StockSignal, load_kospi_top100
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -106,19 +110,31 @@ class AppliedSettingsResponse(BaseModel):
 
 
 class RecommendationsResponse(BaseModel):
-    buy_recommendations: List[BuyRecommendationResponse]
-    sell_recommendations: List[SellRecommendationResponse]
-    all_buy_signals: List[BuySignalResponse]  # All signals regardless of cash
+    buy_recommendations: list[BuyRecommendationResponse]
+    sell_recommendations: list[SellRecommendationResponse]
+    all_buy_signals: list[BuySignalResponse]  # All signals regardless of cash
     scanned_count: int
     signal_count: int
     applied_settings: AppliedSettingsResponse  # Settings used for this scan
 
 
+def _trigger_background_refresh():
+    """Trigger background signal refresh (non-blocking)."""
+    try:
+        precompute_all_signals(force_fetch=False)
+        logger.debug("Background signal refresh completed")
+    except Exception as e:
+        logger.warning(f"Background signal refresh failed: {e}")
+
+
 @router.get("", response_model=RecommendationsResponse)
 async def get_recommendations(
+    background_tasks: BackgroundTasks,
     max_results: int = Query(default=5, ge=1, le=20),
     confidence_threshold: int = Query(default=60, ge=0, le=100),
-    force_fetch: bool = Query(default=False, description="Force fetch from yfinance and save to DB"),
+    force_fetch: bool = Query(
+        default=False, description="Force fetch from yfinance and save to DB"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -129,22 +145,17 @@ async def get_recommendations(
     buy recommendations based on the Bollinger Band Squeeze strategy.
 
     Data source:
-    - Default: Uses DB data if fetched within 30 minutes, otherwise fetches from yfinance
-    - force_fetch=true: Always fetch from yfinance and save to DB
+    - Default: Uses pre-computed cached signals with stale-while-revalidate
+      - If cache is fresh (< 1 min): Return immediately
+      - If cache is stale (1-5 min): Return stale data + trigger background refresh
+      - If cache is expired (> 5 min): Compute fresh (slower)
+    - force_fetch=true: Force fresh computation from yfinance
     """
-    # Get user's portfolio to check existing positions
-    portfolio = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).first()
-
+    # Stale-while-revalidate uses the signal_precomputer functions directly
     existing_positions = []
-    available_cash = 1_000_000  # Default
-    initial_capital = 1_000_000  # Default
+    available_cash = 1_000_000
+    initial_capital = 1_000_000
     position_count = 0
-
-    if portfolio:
-        existing_positions = [p.stock_code for p in portfolio.positions]
-        available_cash = portfolio.cash_balance
-        initial_capital = portfolio.initial_capital
-        position_count = len(portfolio.positions)
 
     settings = db.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
 
@@ -183,6 +194,68 @@ async def get_recommendations(
             "006400",  # Samsung SDI
         ]
 
+    # Stale-While-Revalidate: Try to use cached signals if not force_fetch
+    signals = []
+    use_cache = not force_fetch
+
+    if use_cache:
+        # Use stale-while-revalidate pattern
+        cached_data, is_stale = get_cached_signals_with_staleness("bollinger")
+
+        if cached_data and "signals" in cached_data:
+            cache_age = cached_data.get("computed_at", "unknown")
+            if is_stale:
+                logger.info(
+                    f"Using STALE cached signals (computed at {cache_age}), "
+                    "triggering background refresh"
+                )
+                # Schedule background refresh (non-blocking)
+                background_tasks.add_task(_trigger_background_refresh)
+            else:
+                logger.debug(f"Using FRESH cached signals (computed at {cache_age})")
+
+            # Convert cached dicts back to StockSignal objects
+            for sig_dict in cached_data["signals"]:
+                # Filter out existing positions
+                if sig_dict["stock_code"] not in existing_positions:
+                    signals.append(
+                        StockSignal(
+                            stock_code=sig_dict["stock_code"],
+                            stock_name=sig_dict["stock_name"],
+                            signal_type=sig_dict["signal_type"],
+                            confidence_score=sig_dict["confidence_score"],
+                            current_price=sig_dict["current_price"],
+                            reason=sig_dict["reason"],
+                            indicators=sig_dict["indicators"],
+                        )
+                    )
+            # Filter by confidence threshold
+            signals = [s for s in signals if s.confidence_score >= confidence_threshold]
+
+    # If no cached signals (even stale) or force_fetch, compute fresh
+    if not signals or force_fetch:
+        scanner = SignalScanner(
+            confidence_threshold=confidence_threshold,
+            stop_loss_percent=stop_loss_pct,
+            take_profit_pct=take_profit_pct,
+            take_profit_ratio=take_profit_ratio,
+            sell_on_middle_band=sell_on_middle_band,
+            bollinger_period=bollinger_period,
+            bollinger_std_dev=bollinger_std_dev,
+            squeeze_threshold_pct=squeeze_threshold_pct,
+            squeeze_lookback_days=squeeze_lookback_days,
+            max_positions=max_positions,
+            max_position_pct=max_position_pct,
+        )
+        signals = scanner.scan_for_buy_signals(
+            stock_codes=stock_codes,
+            existing_positions=existing_positions,
+            max_results=max_results * 2,
+            force_fetch=force_fetch,
+        )
+        logger.debug(f"Computed fresh signals: {len(signals)} found")
+
+    # Create scanner instance for sell signals (reuse cached signals for buy)
     scanner = SignalScanner(
         confidence_threshold=confidence_threshold,
         stop_loss_percent=stop_loss_pct,
@@ -195,12 +268,6 @@ async def get_recommendations(
         squeeze_lookback_days=squeeze_lookback_days,
         max_positions=max_positions,
         max_position_pct=max_position_pct,
-    )
-    signals = scanner.scan_for_buy_signals(
-        stock_codes=stock_codes,
-        existing_positions=existing_positions,
-        max_results=max_results * 2,  # Get more signals for filtering
-        force_fetch=force_fetch,
     )
 
     # Generate recommendations with position sizing from user settings
@@ -217,52 +284,8 @@ async def get_recommendations(
         initial_capital=float(initial_capital),
     )
 
-    # Scan for SELL signals on existing positions
+    # Portfolio, position, and trade functionality removed - no sell recommendations
     sell_recs = []
-    if portfolio and portfolio.positions:
-        import yfinance as yf
-
-        positions_data = []
-        for p in portfolio.positions:
-            current_price = None
-            try:
-                ticker = yf.Ticker(f"{p.stock_code}.KS")
-                hist = ticker.history(period="1d")
-                if not hist.empty:
-                    current_price = float(hist["Close"].iloc[-1])
-            except Exception:
-                pass
-            positions_data.append(
-                {
-                    "stock_code": p.stock_code,
-                    "stock_name": p.stock_name,
-                    "avg_entry_price": float(p.avg_entry_price),
-                    "quantity": p.quantity,
-                    "current_price": current_price,
-                    "partial_take_profit_executed": getattr(
-                        p, "partial_take_profit_executed", False
-                    ),
-                }
-            )
-        sell_signals = scanner.scan_for_sell_signals(positions_data)
-
-        for sig in sell_signals:
-            pos = next((p for p in portfolio.positions if p.stock_code == sig.stock_code), None)
-            if pos:
-                sell_recs.append(
-                    SellRecommendationResponse(
-                        stock_code=sig.stock_code,
-                        stock_name=sig.stock_name,
-                        current_price=sig.current_price,
-                        quantity=pos.quantity,
-                        sell_quantity=sig.indicators.get("sell_quantity", pos.quantity),
-                        sell_ratio=sig.indicators.get("sell_ratio", 1.0),
-                        entry_price=float(pos.avg_entry_price),
-                        pnl_pct=sig.indicators.get("pnl_pct", 0),
-                        reason=sig.reason,
-                        indicators=sig.indicators,
-                    )
-                )
 
     # Convert BUY recommendations to response format
     buy_recs = []
@@ -330,7 +353,7 @@ async def get_recommendations(
 @router.get("/signal/{stock_code}", response_model=SignalResponse)
 async def get_stock_signal(
     stock_code: str,
-    current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(get_current_user),
 ):
     """Get signal analysis for a specific stock."""
     scanner = SignalScanner()
@@ -356,5 +379,3 @@ async def get_stock_signal(
         reason=signal.reason,
         indicators=signal.indicators,
     )
-
-

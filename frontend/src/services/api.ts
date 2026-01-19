@@ -14,11 +14,17 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   headers?: Record<string, string>;
+  timeout?: number; // Timeout in milliseconds
 }
+
+// Default timeout values (in milliseconds)
+const DEFAULT_TIMEOUT = 30000; // 30 seconds for normal requests
+const LONG_TIMEOUT = 120000; // 2 minutes for force_fetch requests
 
 interface ApiError {
   detail: string;
   status: number;
+  isTimeout?: boolean;
 }
 
 class ApiClient {
@@ -40,6 +46,10 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const { method = 'GET', body, headers = {} } = options;
 
+    // Determine timeout based on endpoint or explicit option
+    const isLongRequest = endpoint.includes('force_fetch=true');
+    const timeout = options.timeout ?? (isLongRequest ? LONG_TIMEOUT : DEFAULT_TIMEOUT);
+
     const requestHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       ...headers,
@@ -49,32 +59,52 @@ class ApiClient {
       requestHeaders['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method,
-      headers: requestHeaders,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    if (!response.ok) {
-      const error: ApiError = {
-        detail: 'An error occurred',
-        status: response.status,
-      };
-      try {
-        const errorData = await response.json();
-        error.detail = errorData.detail || error.detail;
-      } catch {
-        // Ignore JSON parse errors
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method,
+        headers: requestHeaders,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const error: ApiError = {
+          detail: 'An error occurred',
+          status: response.status,
+        };
+        try {
+          const errorData = await response.json();
+          error.detail = errorData.detail || error.detail;
+        } catch {
+          // Ignore JSON parse errors
+        }
+        throw error;
       }
-      throw error;
-    }
 
-    // Handle 204 No Content
-    if (response.status === 204) {
-      return {} as T;
-    }
+      // Handle 204 No Content
+      if (response.status === 204) {
+        return {} as T;
+      }
 
-    return response.json();
+      return response.json();
+    } catch (err) {
+      // Handle abort/timeout error
+      if (err instanceof Error && err.name === 'AbortError') {
+        const timeoutError: ApiError = {
+          detail: `요청 시간이 초과되었습니다 (${timeout / 1000}초). 네트워크 상태를 확인하거나 잠시 후 다시 시도해주세요.`,
+          status: 408, // Request Timeout
+          isTimeout: true,
+        };
+        throw timeoutError;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   // Health check
@@ -184,6 +214,44 @@ export async function getContrarianCandidates(
     url += `&scan_date=${scanDate}`;
   }
   return api.get<ContrarianCandidatesResponse>(url);
+}
+
+// Watchlist API functions
+
+export interface WatchlistItem {
+  stock_code: string;
+  stock_name: string;
+  current_price: { close: number } | null;
+  indicators: { rsi: number; macd: number } | null;
+  recommendation_score: number | null;
+  recommendation_reason: string | null;
+  added_at: string;
+}
+
+export interface AddToWatchlistRequest {
+  stock_code: string;
+  stock_name: string;
+}
+
+/**
+ * Get user's watchlist with insights.
+ */
+export async function getWatchlist(): Promise<WatchlistItem[]> {
+  return api.get<WatchlistItem[]>('/watchlists');
+}
+
+/**
+ * Add stock to watchlist.
+ */
+export async function addToWatchlist(request: AddToWatchlistRequest): Promise<{ status: string; watchlist_id: string }> {
+  return api.post<{ status: string; watchlist_id: string }>('/watchlists', request);
+}
+
+/**
+ * Remove stock from watchlist.
+ */
+export async function removeFromWatchlist(stockCode: string): Promise<{ status: string }> {
+  return api.delete<{ status: string }>(`/watchlists/${stockCode}`);
 }
 
 export type { ApiError };

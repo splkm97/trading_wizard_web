@@ -15,7 +15,6 @@ from src.auth.challenge_store import challenge_store
 from src.auth.middleware import get_current_user
 from src.models.user import User
 from src.models.user_settings import UserSettings
-from src.models.portfolio import Portfolio
 from src.core.exceptions import InvalidKeyError, InvalidSignatureError
 from src.core.logging import logger
 
@@ -41,7 +40,9 @@ class RegisterResponse(BaseModel):
 class ChallengeRequest(BaseModel):
     """Challenge request."""
 
-    fingerprint: str = Field(..., min_length=64, max_length=64, description="Public key SHA-256 fingerprint")
+    fingerprint: str = Field(
+        ..., min_length=64, max_length=64, description="Public key SHA-256 fingerprint"
+    )
 
 
 class ChallengeResponse(BaseModel):
@@ -106,10 +107,6 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
         # Create default settings
         settings = UserSettings(user_id=user.id)
         db.add(settings)
-
-        # Create portfolio with default initial capital
-        portfolio = Portfolio(user_id=user.id)
-        db.add(portfolio)
 
         db.commit()
 

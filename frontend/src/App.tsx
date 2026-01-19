@@ -7,8 +7,7 @@ import { Navigation } from './components/common/Navigation';
 import { Disclaimer } from './components/common/Disclaimer';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import TradePage from './pages/TradePage';
-import { HistoryPage } from './pages/HistoryPage';
+import WatchlistPage from './pages/WatchlistPage';
 import { BacktestPage } from './pages/BacktestPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SimulationPage } from './pages/SimulationPage';
@@ -54,18 +53,10 @@ function App() {
             }
           />
           <Route
-            path="/trade"
+            path="/watchlist"
             element={
               <ProtectedRoute>
-                <TradePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/history"
-            element={
-              <ProtectedRoute>
-                <HistoryPage />
+                <WatchlistPage />
               </ProtectedRoute>
             }
           />

@@ -26,10 +26,9 @@ class User(BaseModel):
     last_login_at = Column(DateTime, nullable=True)
 
     # Relationships
-    portfolio = relationship("Portfolio", back_populates="user", uselist=False)
     settings = relationship("UserSettings", back_populates="user", uselist=False)
     backtest_results = relationship("BacktestResult", back_populates="user")
-    stock_lists = relationship("StockList", back_populates="user")
+    watchlists = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
 
     def update_last_login(self):
         """Update last login timestamp."""
