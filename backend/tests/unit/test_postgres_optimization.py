@@ -167,14 +167,15 @@ class TestSignalScannerDBFirst:
     def test_signal_scanner_get_stock_data_tries_db_first(self):
         """Test that SignalScanner._get_stock_data tries DB before yfinance."""
         from src.wizard.signal_scanner import SignalScanner
+        from datetime import datetime
 
-        scanner = SignalScanner(use_cache=False)
+        scanner = SignalScanner()
 
         with patch("src.wizard.signal_scanner.fetch_stock_data_from_db") as mock_db, patch(
             "src.wizard.signal_scanner.fetch_stock_data"
         ) as mock_yf:
 
-            # DB returns valid data
+            # DB returns valid data with recent last_fetched_at
             mock_df = pd.DataFrame(
                 {
                     "Open": [100.0] * 35,
@@ -185,7 +186,8 @@ class TestSignalScannerDBFirst:
                 },
                 index=pd.date_range(end=date.today(), periods=35, freq="D"),
             )
-            mock_db.return_value = mock_df
+            # Return tuple (df, last_fetched_at)
+            mock_db.return_value = (mock_df, datetime.now())
 
             result = scanner._get_stock_data("005930")
 
@@ -198,14 +200,14 @@ class TestSignalScannerDBFirst:
         """Test that SignalScanner falls back to yfinance when DB fails."""
         from src.wizard.signal_scanner import SignalScanner
 
-        scanner = SignalScanner(use_cache=False)
+        scanner = SignalScanner()
 
         with patch("src.wizard.signal_scanner.fetch_stock_data_from_db") as mock_db, patch(
             "src.wizard.signal_scanner.fetch_stock_data"
         ) as mock_yf:
 
-            # DB returns None
-            mock_db.return_value = None
+            # DB returns None (tuple format: df=None, last_fetched_at=None)
+            mock_db.return_value = (None, None)
 
             # yfinance returns valid data
             mock_df = pd.DataFrame(

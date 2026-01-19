@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html class="dark" lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>프리미엄 네이비 분석 대시보드 V3 | 스톡펄스</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#D4AF37","mint": "#A8DADC","navy-deep": "#0A0E17","navy-card": "#151B28","navy-border": "#222D3F",
+                        "text-muted": "#8E9BB3",
+                    },
+                    fontFamily: {
+                        "display": ["Pretendard", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.375rem",
+                        "lg": "0.75rem",
+                        "xl": "1.25rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body { font-family: 'Pretendard', sans-serif; font-weight: 300; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .gauge-conic {background: conic-gradient(#A8DADC var(--progress), #1E293B 0deg);
+        }
+        .gauge-inner {
+            width: calc(100% - 4px);
+            height: calc(100% - 4px);
+        }
+        .sidebar-item-active {
+            background: linear-gradient(90deg, rgba(212, 175, 55, 0.1) 0%, rgba(212, 175, 55, 0) 100%);
+            border-left: 2px solid #D4AF37;
+        }
+    </style>
+</head>
+<body class="bg-navy-deep text-slate-200 font-display min-h-screen">
+<div class="flex h-screen overflow-hidden">
+<aside class="w-64 flex flex-col bg-navy-deep border-r border-navy-border transition-colors">
+<div class="p-8">
+<div class="flex items-center gap-3 mb-12">
+<div class="w-8 h-8 flex items-center justify-center rounded bg-primary/10">
+<span class="material-symbols-outlined text-primary text-xl font-light">auto_graph</span>
+</div>
+<div>
+<h1 class="text-base font-semibold tracking-tight text-white">스톡펄스</h1>
+<p class="text-primary/70 text-[10px] uppercase tracking-[0.2em] font-medium">Premium Dashboard</p>
+</div>
+</div>
+<nav class="flex flex-col gap-1.5">
+<a class="flex items-center gap-3 px-4 py-3 rounded sidebar-item-active text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">dashboard</span>
+<span class="text-[13px] font-medium">대시보드</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded text-text-muted hover:text-white hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="text-[13px] font-light">포트폴리오</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded text-text-muted hover:text-white hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined">star</span>
+<span class="text-[13px] font-light">관심종목</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded text-text-muted hover:text-white hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-[13px] font-light">고급 차트</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto p-8 border-t border-navy-border/50">
+<a class="flex items-center gap-3 px-4 py-2 rounded text-text-muted hover:text-white transition-all mb-6" href="#">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span class="text-[12px] font-light">설정</span>
+</a>
+<div class="flex items-center gap-3 px-2">
+<div class="w-8 h-8 rounded-full border border-primary/30 p-0.5">
+<div class="w-full h-full rounded-full bg-cover" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDnSR2Juzbhh8LToEPvjbCiDgpbwCOwbJWFTKQ4aeIwty1uyhhSrFjpGCPWj0_fhnWO1-RYuWA8E1DoA8m4jPqSBwuKFjRY2mE695dv7MYsWSHTcCal34utSkd92hnKw76xteQrJyt5wcwirUOC1mprfwUpisSGSxhuQctYpF1iDDwWYbyMwiKkd-LvwQ5yAEFtC3uI5zHQGu-VBxBcI1bK9M954XgNgsaj01m904hI_QqnDIVASwLRLR2AbFZz-JyGgg2UWJoZsWA')"></div>
+</div>
+<div class="overflow-hidden">
+<p class="text-[12px] font-medium text-white truncate">홍길동 트레이더</p>
+<p class="text-[10px] text-primary/80 font-light">PREMIUM PLAN</p>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col overflow-y-auto">
+<header class="sticky top-0 z-20 flex items-center justify-between px-10 py-5 bg-navy-deep/80 backdrop-blur-xl border-b border-navy-border/50">
+<div class="flex items-center gap-10">
+<div class="flex items-center gap-8">
+<div class="flex flex-col">
+<span class="text-[9px] uppercase tracking-[0.2em] text-text-muted mb-0.5">KOSPI</span>
+<span class="text-sm font-light text-white">2,560.42 <span class="text-mint ml-1">+0.45%</span></span>
+</div>
+<div class="flex flex-col border-l border-navy-border/50 pl-8">
+<span class="text-[9px] uppercase tracking-[0.2em] text-text-muted mb-0.5">KOSDAQ</span>
+<span class="text-sm font-light text-white">862.15 <span class="text-rose-400 ml-1">-0.12%</span></span>
+</div>
+</div>
+<div class="relative w-72 group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-lg">search</span>
+<input class="w-full h-10 pl-10 pr-4 bg-navy-card/50 border border-navy-border rounded-lg text-xs font-light text-white placeholder-text-muted focus:ring-0 focus:border-primary/50 transition-all" placeholder="종목명 또는 심볼 검색" type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-5">
+<button class="relative w-10 h-10 flex items-center justify-center rounded-lg border border-navy-border text-text-muted hover:text-white transition-all">
+<span class="material-symbols-outlined font-light">notifications</span>
+<span class="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-primary rounded-full ring-4 ring-navy-deep"></span>
+</button>
+<button class="px-5 h-10 flex items-center justify-center rounded-lg bg-primary text-navy-deep text-xs font-semibold tracking-tight hover:brightness-110 transition-all">
+                    프로 업그레이드
+                </button>
+</div>
+</header>
+<div class="p-10 max-w-[1440px] mx-auto w-full">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+<div>
+<h2 class="text-2xl font-extralight tracking-tight text-white mb-2">오늘의 <span class="font-semibold text-primary">매수 추천 종목</span></h2>
+<p class="text-text-muted text-[13px] font-light">실시간 기술 지표 분석 기반 프리미엄 종목 스캐너</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex bg-navy-card border border-navy-border p-1 rounded-lg">
+<button class="px-5 py-2 text-[11px] font-medium rounded-md bg-navy-border text-white shadow-sm">실시간</button>
+<button class="px-5 py-2 text-[11px] font-light text-text-muted hover:text-white">과거 데이터</button>
+</div>
+<button class="flex items-center gap-2 px-5 h-10 rounded-lg border border-navy-border text-[11px] font-light hover:bg-navy-card transition-colors">
+<span class="material-symbols-outlined text-sm">refresh</span>
+                        데이터 새로고침
+                    </button>
+</div>
+</div>
+<div class="flex border-b border-navy-border/50 mb-10 overflow-x-auto whitespace-nowrap scrollbar-hide">
+<a class="px-8 py-4 text-[13px] font-medium border-b border-primary text-primary" href="#">전체 종목</a>
+<a class="px-8 py-4 text-[13px] font-light text-text-muted hover:text-white transition-colors" href="#">IT/반도체</a>
+<a class="px-8 py-4 text-[13px] font-light text-text-muted hover:text-white transition-colors" href="#">에너지/화학</a>
+<a class="px-8 py-4 text-[13px] font-light text-text-muted hover:text-white transition-colors" href="#">금융</a>
+<a class="px-8 py-4 text-[13px] font-light text-text-muted hover:text-white transition-colors" href="#">바이오</a>
+<a class="px-8 py-4 text-[13px] font-light text-text-muted hover:text-white transition-colors" href="#">제조업</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+<div class="bg-navy-card rounded-xl border border-navy-border p-6 flex flex-col hover:border-primary/40 transition-all group relative overflow-hidden">
+<div class="flex justify-between items-start mb-8">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center overflow-hidden border border-navy-border">
+<img class="w-8 h-8 object-contain" data-alt="삼성전자 로고" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeECArGl6fCZb1AbEWXTaNW2pNF10YhrpcCCp9Y9eyC4280uORy5U4pOS9m0jdBJctTZJBfGmSsS6lkXzMLTZ1BfS8qQr9jQ-wULdfnuJlkvGwSHycEmwDMSmsIlYAyvnH2SaoLwpi3q3nTC7_efiQWGnFdvAEFVcgtRjCMVHB8etDNfw7LoB3L1jTSpiiLRF5Y7PbPs1sLvzr43Tve4d0rJ1fJ6SMIQgYoPViyyAwyOOSBKEyWJnmyvRAyhxAYWq7ywRdSCBRC6s"/>
+</div>
+<div>
+<h3 class="font-medium text-[15px] text-white">삼성전자</h3>
+<p class="text-[10px] text-text-muted font-light tracking-wider">005930.KS</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-medium text-[15px] text-white">₩72,400</p>
+<p class="text-[11px] font-light text-mint">+1.2%</p>
+</div>
+</div>
+<div class="relative flex flex-col items-center justify-center mb-8">
+<div class="w-32 h-32 rounded-full gauge-conic flex items-center justify-center p-[2px] relative" style="--progress: 316.8deg;">
+<div class="gauge-inner bg-navy-card rounded-full flex flex-col items-center justify-center">
+<span class="text-3xl font-extralight text-white leading-none">88<span class="text-[14px] ml-0.5">%</span></span>
+<span class="text-[9px] font-medium text-mint tracking-[0.2em] mt-1.5 uppercase">Strong Buy</span>
+</div>
+</div>
+<p class="text-[10px] text-text-muted mt-3 font-light tracking-wide">종합 매수 시그널</p>
+</div>
+<div class="space-y-4 mb-8">
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>RSI (14)</span>
+<span class="text-mint font-medium">74.2</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 74%"></div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>MACD 시그널</span>
+<span class="text-mint font-medium">상승 반전</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 90%"></div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>이동평균선</span>
+<span class="text-mint font-medium">정배열</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 85%"></div>
+</div>
+</div>
+</div>
+<a class="mt-auto w-full py-3 border border-primary/30 text-primary text-[11px] font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-primary hover:text-navy-deep transition-all" href="#">
+                        토스증권에서 차트 보기
+                        <span class="material-symbols-outlined text-sm">open_in_new</span>
+</a>
+</div>
+<div class="bg-navy-card rounded-xl border border-navy-border p-6 flex flex-col hover:border-primary/40 transition-all group">
+<div class="flex justify-between items-start mb-8">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center overflow-hidden border border-navy-border">
+<img class="w-8 h-8 object-contain" data-alt="SK하이닉스 로고" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAIPGvIO4N5OjmBIXKSOoopF1kO3glc-nMt0aD35z2DxG_dVsOov7Yi-ylruzGD4_NExtlR1b-bAYLWsAo9iZ3crdfv43ZZ1Afy3QG5AMDk71TaQX1oEgsN6wH16iC1zZpxI7-SLKd8ULU6x9oXdaTS6x-sHdctYQhO_2JEndU4NFJNloA0W8Pauv5tcq52Ku_7oIxxk6I-cIy15ynW9AG5gd3GCDBWr49ucWrmlaPYjsqSDOMIc0kLXOuNiP9xzwbCYnUwQQY0-DI"/>
+</div>
+<div>
+<h3 class="font-medium text-[15px] text-white">SK하이닉스</h3>
+<p class="text-[10px] text-text-muted font-light tracking-wider">000660.KS</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-medium text-[15px] text-white">₩118,200</p>
+<p class="text-[11px] font-light text-mint">+2.5%</p>
+</div>
+</div>
+<div class="relative flex flex-col items-center justify-center mb-8">
+<div class="w-32 h-32 rounded-full gauge-conic flex items-center justify-center p-[2px] relative" style="--progress: 331.2deg;">
+<div class="gauge-inner bg-navy-card rounded-full flex flex-col items-center justify-center">
+<span class="text-3xl font-extralight text-white leading-none">92<span class="text-[14px] ml-0.5">%</span></span>
+<span class="text-[9px] font-medium text-mint tracking-[0.2em] mt-1.5 uppercase">Strong Buy</span>
+</div>
+</div>
+<p class="text-[10px] text-text-muted mt-3 font-light tracking-wide">종합 매수 시그널</p>
+</div>
+<div class="space-y-4 mb-8">
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>RSI (14)</span>
+<span class="text-mint font-medium">82.1</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 82%"></div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>MACD 시그널</span>
+<span class="text-mint font-medium">강력 매수</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 95%"></div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>이동평균선</span>
+<span class="text-mint font-medium">상향 돌파</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 90%"></div>
+</div>
+</div>
+</div>
+<a class="mt-auto w-full py-3 border border-primary/30 text-primary text-[11px] font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-primary hover:text-navy-deep transition-all" href="#">
+                        토스증권에서 차트 보기
+                        <span class="material-symbols-outlined text-sm">open_in_new</span>
+</a>
+</div>
+<div class="bg-navy-card rounded-xl border border-navy-border p-6 flex flex-col hover:border-primary/40 transition-all group">
+<div class="flex justify-between items-start mb-8">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center overflow-hidden border border-navy-border">
+<img class="w-8 h-8 object-contain" data-alt="NAVER 로고" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTENpaZIAAb_Y_l8KqehicjoRAP5LXDs8tWgfs_uS2dKyUAsSq9YV93PvpwRxU0hZJOBkn5iu8A7X_UoRYnilx7F_AGJPSNYhbcj7_uA5BPc6yLBvLu624zPNAW-S_RpBDWqo85dwxADzrZJKuPj_RfOBC79UZEWswV5zDyLpvPR89phX0cxAcaQUjaYVlMDfizkwK2VMilFVzr7XqUYxyrSXIyjtClJXswgB4RVDKEo5ymRhJXASzpJLYoOxwyEDDHNwdWOOUCXo"/>
+</div>
+<div>
+<h3 class="font-medium text-[15px] text-white">NAVER</h3>
+<p class="text-[10px] text-text-muted font-light tracking-wider">035420.KS</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-medium text-[15px] text-white">₩210,500</p>
+<p class="text-[11px] font-light text-rose-400">-0.8%</p>
+</div>
+</div>
+<div class="relative flex flex-col items-center justify-center mb-8">
+<div class="w-32 h-32 rounded-full gauge-conic flex items-center justify-center p-[2px] relative" style="--progress: 266.4deg;">
+<div class="gauge-inner bg-navy-card rounded-full flex flex-col items-center justify-center">
+<span class="text-3xl font-extralight text-white leading-none">74<span class="text-[14px] ml-0.5">%</span></span>
+<span class="text-[9px] font-medium text-mint tracking-[0.2em] mt-1.5 uppercase">Buy</span>
+</div>
+</div>
+<p class="text-[10px] text-text-muted mt-3 font-light tracking-wide">종합 매수 시그널</p>
+</div>
+<div class="space-y-4 mb-8">
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>RSI (14)</span>
+<span class="text-mint font-medium">54.5</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 54%"></div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>MACD 시그널</span>
+<span class="text-mint font-medium">중립</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 60%"></div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>이동평균선</span>
+<span class="text-mint font-medium">골든크로스 대기</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 78%"></div>
+</div>
+</div>
+</div>
+<a class="mt-auto w-full py-3 border border-primary/30 text-primary text-[11px] font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-primary hover:text-navy-deep transition-all" href="#">
+                        토스증권에서 차트 보기
+                        <span class="material-symbols-outlined text-sm">open_in_new</span>
+</a>
+</div>
+<div class="bg-navy-card rounded-xl border border-navy-border p-6 flex flex-col hover:border-primary/40 transition-all group">
+<div class="flex justify-between items-start mb-8">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center overflow-hidden border border-navy-border">
+<img class="w-8 h-8 object-contain" data-alt="카카오 로고" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqbuM9YAeOalIzW4B9jcsjqCwO27cDcVguuWd3QdLSGYWi2N_0AaHTpG4PGnMNkUhqh-Smvnnuy5_aeQtRZBMRTYYmkliTCBNq_wq9GcbSXjBwrGKzy3U5aQQ4o1q1kvxRLWpdQ8tx2vcKmEvZrGzmW_G5NZQoRMQWFxvmSVoTCvCnIbklQgDKKONVz4_xHL9MuueWf2_fqfjWwRpnEl1PjAx69YJKqLcXPz71lYyQnyDzDvoP0NI82ghnwJ9Te6XHMgPAibkqj88"/>
+</div>
+<div>
+<h3 class="font-medium text-[15px] text-white">카카오</h3>
+<p class="text-[10px] text-text-muted font-light tracking-wider">035720.KS</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-medium text-[15px] text-white">₩48,900</p>
+<p class="text-[11px] font-light text-mint">+0.3%</p>
+</div>
+</div>
+<div class="relative flex flex-col items-center justify-center mb-8">
+<div class="w-32 h-32 rounded-full gauge-conic flex items-center justify-center p-[2px] relative" style="--progress: 234deg;">
+<div class="gauge-inner bg-navy-card rounded-full flex flex-col items-center justify-center">
+<span class="text-3xl font-extralight text-white leading-none">65<span class="text-[14px] ml-0.5">%</span></span>
+<span class="text-[9px] font-medium text-mint tracking-[0.2em] mt-1.5 uppercase">Accumulate</span>
+</div>
+</div>
+<p class="text-[10px] text-text-muted mt-3 font-light tracking-wide">종합 매수 시그널</p>
+</div>
+<div class="space-y-4 mb-8">
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>RSI (14)</span>
+<span class="text-mint font-medium">48.2</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 48%"></div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>MACD 시그널</span>
+<span class="text-mint font-medium">골든크로스</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 65%"></div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between text-[10px] font-light text-text-muted uppercase">
+<span>이동평균선</span>
+<span class="text-mint font-medium">지지선 확인</span>
+</div>
+<div class="h-[3px] w-full bg-navy-border rounded-full overflow-hidden">
+<div class="h-full bg-mint opacity-80" style="width: 72%"></div>
+</div>
+</div>
+</div>
+<a class="mt-auto w-full py-3 border border-primary/30 text-primary text-[11px] font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-primary hover:text-navy-deep transition-all" href="#">
+                        토스증권에서 차트 보기
+                        <span class="material-symbols-outlined text-sm">open_in_new</span>
+</a>
+</div>
+</div>
+<div class="mt-16 p-8 bg-navy-card/40 rounded-2xl border border-navy-border/50">
+<h4 class="text-[11px] font-medium uppercase tracking-[0.2em] mb-8 flex items-center gap-3 text-primary">
+<span class="w-1 h-4 bg-primary rounded-full"></span>
+                    기술 지표 상세 설명
+                </h4>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+<div>
+<p class="text-[13px] font-medium text-white mb-2">RSI (상대강도지수)</p>
+<p class="text-[11px] text-text-muted font-light leading-relaxed">가격의 상승압력과 하락압력 간의 상대적인 강도를 측정하여 과매수 또는 과매도 상태를 나타냅니다.</p>
+</div>
+<div>
+<p class="text-[13px] font-medium text-white mb-2">MACD (이동평균 수렴확산 지수)</p>
+<p class="text-[11px] text-text-muted font-light leading-relaxed">단기 이동평균선과 장기 이동평균선의 차이를 이용하여 추세의 강도와 변화를 분석하는 지표입니다.</p>
+</div>
+<div>
+<p class="text-[13px] font-medium text-white mb-2">이동평균선 (Moving Averages)</p>
+<p class="text-[11px] text-text-muted font-light leading-relaxed">일정 기간 동안의 주가를 산술 평균하여 주가의 흐름과 추세를 매끄럽게 파악하는 데 사용됩니다.</p>
+</div>
+<div>
+<p class="text-[13px] font-medium text-white mb-2">볼린저 밴드 (Bollinger Bands)</p>
+<p class="text-[11px] text-text-muted font-light leading-relaxed">이동평균선을 중심으로 표준편차 범위를 설정하여 주가의 변동성 및 상대적 고점/저점을 식별합니다.</p>
+</div>
+</div>
+</div>
+</div>
+<footer class="mt-auto py-8 px-10 border-t border-navy-border/30 text-center">
+<p class="text-[10px] text-text-muted font-light tracking-widest uppercase">
+                StockPulse Technical Intelligence © 2024. All Rights Reserved. Last Update: 2023. 10. 24 15:30 KST
+            </p>
+</footer>
+</main>
+</div>
+
+</body></html>

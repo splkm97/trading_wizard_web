@@ -1,6 +1,6 @@
 """Watchlist API endpoints."""
 
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -16,10 +16,10 @@ router = APIRouter(prefix="/watchlists", tags=["watchlists"])
 class WatchlistItem(BaseModel):
     stock_code: str
     stock_name: str
-    current_price: dict | None
-    indicators: dict | None
-    recommendation_score: int | None
-    recommendation_reason: str | None
+    current_price: Optional[dict]
+    indicators: Optional[dict]
+    recommendation_score: Optional[int]
+    recommendation_reason: Optional[str]
     added_at: str
 
 
