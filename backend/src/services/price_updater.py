@@ -7,10 +7,8 @@ Runs after market close (15:30 KST) to update historical_prices table.
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
-from typing import List, Optional
+from datetime import date
 
-import pandas as pd
 import yfinance as yf
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -18,7 +16,7 @@ from sqlalchemy.engine import Engine
 logger = logging.getLogger(__name__)
 
 
-def get_db_engine() -> Optional[Engine]:
+def get_db_engine() -> Engine | None:
     """Get SQLAlchemy engine from settings."""
     try:
         from src.core.config import settings
@@ -28,7 +26,7 @@ def get_db_engine() -> Optional[Engine]:
         return None
 
 
-def fetch_closing_price(stock_code: str) -> Optional[dict]:
+def fetch_closing_price(stock_code: str) -> dict | None:
     """
     Fetch today's closing price from yfinance.
 
@@ -69,7 +67,7 @@ def fetch_closing_price(stock_code: str) -> Optional[dict]:
 def save_closing_price(
     stock_code: str,
     price_data: dict,
-    engine: Optional[Engine] = None
+    engine: Engine | None = None
 ) -> bool:
     """
     Save closing price to historical_prices table.
@@ -133,7 +131,7 @@ def save_closing_price(
         return False
 
 
-def get_stocks_needing_update(engine: Optional[Engine] = None) -> List[str]:
+def get_stocks_needing_update(engine: Engine | None = None) -> list[str]:
     """
     Get list of stock codes that need price updates for today.
 
@@ -165,7 +163,7 @@ def get_stocks_needing_update(engine: Optional[Engine] = None) -> List[str]:
         return []
 
 
-def update_all_closing_prices(stock_codes: Optional[List[str]] = None) -> dict:
+def update_all_closing_prices(stock_codes: list[str] | None = None) -> dict:
     """
     Update closing prices for all stocks or specified list.
 
@@ -240,8 +238,9 @@ def scheduled_price_update():
     Scheduled job to run after market close.
     Updates all stocks in the database with today's closing prices.
     """
-    import pytz
     from datetime import datetime
+
+    import pytz
 
     kst = pytz.timezone("Asia/Seoul")
     now = datetime.now(kst)

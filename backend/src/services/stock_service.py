@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Optional
 
 from src.core.logging import logger
 
@@ -13,7 +12,7 @@ from src.core.logging import logger
 class StockService:
     """Service for stock code validation and name lookup."""
 
-    _instance: Optional[StockService] = None
+    _instance: StockService | None = None
     _stock_names: dict[str, str] = {}
 
     def __new__(cls) -> StockService:
@@ -34,7 +33,7 @@ class StockService:
 
         for path in possible_paths:
             if path.exists():
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     self._stock_names = json.load(f)
                 logger.info(f"Loaded {len(self._stock_names)} stock names from {path}")
                 return
@@ -47,7 +46,7 @@ class StockService:
         """Validate stock code format (6-digit number)."""
         return bool(re.match(r"^[0-9]{6}$", stock_code))
 
-    def get_stock_name(self, stock_code: str) -> Optional[str]:
+    def get_stock_name(self, stock_code: str) -> str | None:
         """Get stock name by code.
 
         Args:

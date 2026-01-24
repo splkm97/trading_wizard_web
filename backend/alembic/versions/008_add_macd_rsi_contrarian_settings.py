@@ -10,8 +10,9 @@ Adds new columns for MACD/RSI contrarian signal detection strategy:
 - Confidence threshold for contrarian signals
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "008"
 down_revision = "007"

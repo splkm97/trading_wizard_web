@@ -5,10 +5,12 @@ Revises: 002
 Create Date: 2025-01-07
 """
 
-from alembic import op
-import sqlalchemy as sa
-from datetime import datetime
 import uuid
+from datetime import datetime
+
+import sqlalchemy as sa
+
+from alembic import op
 
 revision = "003"
 down_revision = "002"

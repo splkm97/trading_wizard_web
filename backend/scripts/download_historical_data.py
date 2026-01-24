@@ -7,7 +7,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
 
 import yfinance as yf
 from sqlalchemy import create_engine

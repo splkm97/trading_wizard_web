@@ -7,8 +7,6 @@ Adapted from trading_wizard_bundle for web application use.
 import warnings
 from dataclasses import dataclass
 from datetime import date, timedelta
-from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import yfinance as yf
@@ -41,7 +39,7 @@ class PositionInfo:
     entry_price: float
 
 
-def fetch_stock_data(stock_code: str, days: int = 60) -> Optional[pd.DataFrame]:
+def fetch_stock_data(stock_code: str, days: int = 60) -> pd.DataFrame | None:
     """
     Fetch OHLCV data from Yahoo Finance.
 
@@ -93,7 +91,7 @@ def fetch_stock_data_for_date(
     stock_code: str,
     target_date: date,
     days: int = 60,
-) -> Optional[pd.DataFrame]:
+) -> pd.DataFrame | None:
     """
     Fetch OHLCV data up to a specific date (for backtesting).
 
@@ -204,7 +202,7 @@ class SignalScanner:
         df: pd.DataFrame,
         stock_code: str,
         stock_name: str,
-    ) -> Optional[StockSignal]:
+    ) -> StockSignal | None:
         """Check if a stock has a buy signal."""
         df = calculate_all_indicators(df)
         latest = df.iloc[-1]
@@ -281,7 +279,7 @@ class SignalScanner:
         self,
         df: pd.DataFrame,
         pos: PositionInfo,
-    ) -> Optional[StockSignal]:
+    ) -> StockSignal | None:
         df = calculate_all_indicators(df)
         latest = df.iloc[-1]
         current_price = float(latest["Close"])

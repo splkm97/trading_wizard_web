@@ -3,7 +3,6 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 import pytz
 
 
@@ -12,7 +11,6 @@ class TestSignalPrecomputer:
 
     def test_is_market_hours_during_trading(self):
         """Test is_market_hours returns True during market hours."""
-        from src.services.signal_precomputer import is_market_hours
 
         # Mock datetime to be during market hours (10:00 KST on Monday)
         mock_now = datetime(2026, 1, 13, 10, 0, 0, tzinfo=pytz.timezone("Asia/Seoul"))
@@ -24,7 +22,7 @@ class TestSignalPrecomputer:
 
     def test_is_market_hours_weekend(self):
         """Test is_market_hours returns False on weekends."""
-        from src.services.signal_precomputer import is_market_hours, KST
+        from src.services.signal_precomputer import KST
 
         # Create a Saturday datetime
         saturday = datetime(2026, 1, 11, 10, 0, 0)  # Saturday
@@ -69,7 +67,6 @@ class TestSignalPrecomputer:
     def test_get_cached_signals_returns_none_when_empty(self):
         """Test get_cached_signals returns None when cache is empty."""
         from src.services.signal_precomputer import get_cached_signals
-        from src.core.cache import CacheService
 
         # Use a fresh cache instance
         with patch("src.services.signal_precomputer.get_cache_service") as mock_cache:

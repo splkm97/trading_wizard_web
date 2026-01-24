@@ -4,19 +4,16 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.db.database import get_db
 from src.auth.middleware import get_current_user
-from src.models.user import User
-from src.models.backtest import BacktestResult
-from src.services.backtest_service import BacktestService
-from src.core.exceptions import NotFoundError
 from src.core.logging import logger
+from src.db.database import get_db
+from src.models.user import User
+from src.services.backtest_service import BacktestService
 
 router = APIRouter(prefix="/backtest", tags=["Backtest"])
 
@@ -26,31 +23,31 @@ class StrategyOverrides(BaseModel):
     """Optional strategy parameter overrides for a single backtest run."""
 
     # Risk Management
-    max_positions: Optional[int] = Field(None, ge=1, le=50)
-    max_position_pct: Optional[float] = Field(None, ge=1, le=100)
-    stop_loss_pct: Optional[float] = Field(None, ge=1, le=50)
-    confidence_threshold: Optional[int] = Field(None, ge=0, le=100)
+    max_positions: int | None = Field(None, ge=1, le=50)
+    max_position_pct: float | None = Field(None, ge=1, le=100)
+    stop_loss_pct: float | None = Field(None, ge=1, le=50)
+    confidence_threshold: int | None = Field(None, ge=0, le=100)
 
     # Take Profit Settings
-    take_profit_enabled: Optional[bool] = None
-    take_profit_pct: Optional[float] = Field(None, ge=5, le=50)
-    take_profit_ratio: Optional[float] = Field(None, ge=0.1, le=1.0)
+    take_profit_enabled: bool | None = None
+    take_profit_pct: float | None = Field(None, ge=5, le=50)
+    take_profit_ratio: float | None = Field(None, ge=0.1, le=1.0)
 
     # Bollinger Band Parameters
-    bollinger_period: Optional[int] = Field(None, ge=5, le=200)
-    bollinger_std_dev: Optional[float] = Field(None, gt=0, le=5)
+    bollinger_period: int | None = Field(None, ge=5, le=200)
+    bollinger_std_dev: float | None = Field(None, gt=0, le=5)
 
     # Squeeze Detection
-    squeeze_threshold_pct: Optional[int] = Field(None, ge=5, le=100)
-    squeeze_lookback_days: Optional[int] = Field(None, ge=2, le=30)
+    squeeze_threshold_pct: int | None = Field(None, ge=5, le=100)
+    squeeze_lookback_days: int | None = Field(None, ge=2, le=30)
 
     # Advanced Squeeze Settings
-    expansion_threshold_pct: Optional[float] = Field(None, ge=5, le=100)
-    band_touch_tolerance: Optional[float] = Field(None, ge=0, le=0.01)
+    expansion_threshold_pct: float | None = Field(None, ge=5, le=100)
+    band_touch_tolerance: float | None = Field(None, ge=0, le=0.01)
 
     # Metrics Configuration
-    trading_days_per_year: Optional[int] = Field(None, ge=200, le=365)
-    days_per_year: Optional[int] = Field(None, ge=360, le=366)
+    trading_days_per_year: int | None = Field(None, ge=200, le=365)
+    days_per_year: int | None = Field(None, ge=360, le=366)
 
 
 class BacktestRunRequest(BaseModel):
@@ -63,8 +60,8 @@ class BacktestRunRequest(BaseModel):
         description="Stock list name (e.g., kospi_top100_2025jan) or custom list ID/name",
     )
     initial_capital: float = Field(1_000_000, gt=0, description="Initial capital (KRW)")
-    name: Optional[str] = Field(None, max_length=100, description="Backtest name")
-    strategy_overrides: Optional[StrategyOverrides] = Field(
+    name: str | None = Field(None, max_length=100, description="Backtest name")
+    strategy_overrides: StrategyOverrides | None = Field(
         None, description="Optional strategy parameter overrides for this backtest"
     )
 
@@ -73,7 +70,7 @@ class BacktestResultResponse(BaseModel):
     """Backtest result summary."""
 
     id: str
-    name: Optional[str]
+    name: str | None
     start_date: str
     end_date: str
     stock_list_name: str

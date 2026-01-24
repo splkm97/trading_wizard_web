@@ -5,7 +5,7 @@ Adapted from trading_wizard_bundle for web application use.
 
 from dataclasses import dataclass
 
-from src.core.signal_scanner import StockSignal, PositionInfo
+from src.core.signal_scanner import PositionInfo, StockSignal
 
 
 @dataclass

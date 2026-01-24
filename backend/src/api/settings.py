@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.db.database import get_db
 from src.auth.middleware import get_current_user
+from src.db.database import get_db
 from src.models.user import User
 from src.services.settings_service import SettingsService
-from src.core.logging import logger
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
 
@@ -63,39 +60,39 @@ class SettingsUpdateRequest(BaseModel):
     """Request to update settings."""
 
     # Risk Management
-    max_positions: Optional[int] = Field(None, ge=1, le=50, description="Max positions (1-50)")
-    max_position_pct: Optional[float] = Field(None, ge=1, le=100, description="Max position % (1-100)")
-    stop_loss_pct: Optional[float] = Field(None, ge=1, le=50, description="Stop loss % (1-50)")
-    confidence_threshold: Optional[int] = Field(None, ge=0, le=100, description="Confidence threshold (0-100)")
+    max_positions: int | None = Field(None, ge=1, le=50, description="Max positions (1-50)")
+    max_position_pct: float | None = Field(None, ge=1, le=100, description="Max position % (1-100)")
+    stop_loss_pct: float | None = Field(None, ge=1, le=50, description="Stop loss % (1-50)")
+    confidence_threshold: int | None = Field(None, ge=0, le=100, description="Confidence threshold (0-100)")
 
     # Take Profit Settings
-    take_profit_enabled: Optional[bool] = Field(None, description="Enable take profit")
-    take_profit_pct: Optional[float] = Field(None, ge=5, le=50, description="Take profit target % (5-50)")
-    take_profit_ratio: Optional[float] = Field(None, ge=0.1, le=1.0, description="Partial sell ratio (0.1-1.0)")
+    take_profit_enabled: bool | None = Field(None, description="Enable take profit")
+    take_profit_pct: float | None = Field(None, ge=5, le=50, description="Take profit target % (5-50)")
+    take_profit_ratio: float | None = Field(None, ge=0.1, le=1.0, description="Partial sell ratio (0.1-1.0)")
 
     # Bollinger Band Parameters
-    bollinger_period: Optional[int] = Field(None, ge=5, le=200, description="Bollinger period (5-200)")
-    bollinger_std_dev: Optional[float] = Field(None, gt=0, le=5, description="Std dev multiplier (0-5)")
+    bollinger_period: int | None = Field(None, ge=5, le=200, description="Bollinger period (5-200)")
+    bollinger_std_dev: float | None = Field(None, gt=0, le=5, description="Std dev multiplier (0-5)")
 
     # Squeeze Detection
-    squeeze_threshold_pct: Optional[int] = Field(None, ge=5, le=100, description="Squeeze threshold % (5-100)")
-    squeeze_lookback_days: Optional[int] = Field(None, ge=2, le=30, description="Lookback days (2-30)")
+    squeeze_threshold_pct: int | None = Field(None, ge=5, le=100, description="Squeeze threshold % (5-100)")
+    squeeze_lookback_days: int | None = Field(None, ge=2, le=30, description="Lookback days (2-30)")
 
     # Advanced Squeeze Settings
-    expansion_threshold_pct: Optional[float] = Field(None, ge=5, le=100, description="Expansion threshold % (5-100)")
-    band_touch_tolerance: Optional[float] = Field(None, ge=0, le=0.01, description="Band touch tolerance (0-0.01)")
+    expansion_threshold_pct: float | None = Field(None, ge=5, le=100, description="Expansion threshold % (5-100)")
+    band_touch_tolerance: float | None = Field(None, ge=0, le=0.01, description="Band touch tolerance (0-0.01)")
 
     # Metrics Configuration
-    trading_days_per_year: Optional[int] = Field(None, ge=200, le=365, description="Trading days per year (200-365)")
-    days_per_year: Optional[int] = Field(None, ge=360, le=366, description="Calendar days per year (360-366)")
+    trading_days_per_year: int | None = Field(None, ge=200, le=365, description="Trading days per year (200-365)")
+    days_per_year: int | None = Field(None, ge=360, le=366, description="Calendar days per year (360-366)")
 
     # MACD/RSI Contrarian Strategy Settings
-    macd_rsi_rsi_period: Optional[int] = Field(None, ge=2, le=50, description="RSI period (2-50)")
-    macd_rsi_rsi_threshold: Optional[float] = Field(None, ge=10, le=50, description="RSI threshold for oversold (10-50)")
-    macd_rsi_macd_fast_period: Optional[int] = Field(None, ge=2, le=50, description="MACD fast period (2-50)")
-    macd_rsi_macd_slow_period: Optional[int] = Field(None, ge=5, le=100, description="MACD slow period (5-100)")
-    macd_rsi_macd_signal_period: Optional[int] = Field(None, ge=2, le=50, description="MACD signal period (2-50)")
-    macd_rsi_confidence_threshold: Optional[float] = Field(None, ge=0, le=100, description="Confidence threshold (0-100)")
+    macd_rsi_rsi_period: int | None = Field(None, ge=2, le=50, description="RSI period (2-50)")
+    macd_rsi_rsi_threshold: float | None = Field(None, ge=10, le=50, description="RSI threshold for oversold (10-50)")
+    macd_rsi_macd_fast_period: int | None = Field(None, ge=2, le=50, description="MACD fast period (2-50)")
+    macd_rsi_macd_slow_period: int | None = Field(None, ge=5, le=100, description="MACD slow period (5-100)")
+    macd_rsi_macd_signal_period: int | None = Field(None, ge=2, le=50, description="MACD signal period (2-50)")
+    macd_rsi_confidence_threshold: float | None = Field(None, ge=0, le=100, description="Confidence threshold (0-100)")
 
 
 class ConstitutionWarning(BaseModel):

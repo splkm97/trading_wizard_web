@@ -1,6 +1,6 @@
 """Historical stock price data model."""
 
-from sqlalchemy import Column, String, Float, BigInteger, DateTime, Index
+from sqlalchemy import BigInteger, Column, DateTime, Float, Index, String
 
 from src.db.database import Base
 

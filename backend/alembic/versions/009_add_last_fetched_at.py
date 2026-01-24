@@ -8,8 +8,9 @@ Adds last_fetched_at column to track when yfinance data was last fetched.
 Used for rate limiting yfinance API calls (30-minute interval).
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "009"
 down_revision = "008"

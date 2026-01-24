@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 class CacheService:
     """Multi-layer cache service using Redis with in-memory fallback."""
 
-    def __init__(self, redis_url: Optional[str] = None):
+    def __init__(self, redis_url: str | None = None):
         self._redis = None
-        self._local_cache: Dict[str, Tuple[Any, datetime]] = {}
+        self._local_cache: dict[str, tuple[Any, datetime]] = {}
 
         if redis_url:
             try:
@@ -33,7 +33,7 @@ class CacheService:
         """Check if Redis is available."""
         return self._redis is not None
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get value from cache."""
         if self._redis:
             try:
@@ -110,7 +110,7 @@ class CacheService:
         return f"recommendations:user:{user_id}"
 
     @staticmethod
-    def prices_key(stock_codes: List[str]) -> str:
+    def prices_key(stock_codes: list[str]) -> str:
         """Generate cache key for batch prices."""
         codes_hash = hash(frozenset(stock_codes))
         return f"prices:batch:{codes_hash}"
@@ -122,7 +122,7 @@ class CacheService:
 
 
 # Lazy initialization - will be initialized when first accessed
-_cache_service: Optional[CacheService] = None
+_cache_service: CacheService | None = None
 
 
 def get_cache_service() -> CacheService:

@@ -5,21 +5,20 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Optional
 
 import pandas as pd
 import yfinance as yf
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from src.core.indicators import calculate_all_indicators, calculate_confidence_score
 from src.models.game_session import (
     GameSession,
     GameStatus,
+    RecommendationCache,
     SimulatedPosition,
     SimulatedTrade,
-    RecommendationCache,
 )
-from src.core.indicators import calculate_all_indicators, calculate_confidence_score
 from src.services.stock_service import stock_service
 from src.wizard.signal_scanner import load_kospi_top100
 
@@ -60,7 +59,7 @@ class SimulationService:
         start_date: date,
         end_date: date,
         initial_capital: Decimal = Decimal("100000000"),
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> GameSession:
         today = date.today()
 
@@ -106,7 +105,7 @@ class SimulationService:
     def list_sessions(
         self,
         user_id: str,
-        status: Optional[GameStatus] = None,
+        status: GameStatus | None = None,
     ) -> list[GameSession]:
         query = self.db.query(GameSession).filter(GameSession.user_id == user_id)
         if status:
@@ -123,7 +122,7 @@ class SimulationService:
         stock_code: str,
         end_date: date,
         days: int = 90,
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """
         Fetch historical data from local database using optimized raw SQL.
 
@@ -190,7 +189,7 @@ class SimulationService:
         stock_code: str,
         end_date: date,
         days: int = 90,
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Fetch historical data from yfinance API (slow, fallback)."""
         start_date = end_date - timedelta(days=days + 30)
 
@@ -229,7 +228,7 @@ class SimulationService:
         end_date: date,
         days: int = 90,
         max_retries: int = 3,
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Fetch historical data: DB first, yfinance as fallback."""
         df = self._fetch_historical_data_from_db(stock_code, end_date, days)
         if df is not None:
@@ -474,7 +473,7 @@ class SimulationService:
             "price_history": price_history,
         }
 
-    def get_price_at_date(self, stock_code: str, target_date: date) -> Optional[float]:
+    def get_price_at_date(self, stock_code: str, target_date: date) -> float | None:
         """Get closing price for a stock at a specific date."""
         df = self._fetch_historical_data(stock_code, target_date, days=60)
         if df is None or len(df) == 0:
@@ -488,7 +487,7 @@ class SimulationService:
         stock_name: str,
         quantity: int,
         price: Decimal,
-        confidence_score: Optional[Decimal] = None,
+        confidence_score: Decimal | None = None,
     ) -> SimulatedTrade:
         existing_position = (
             self.db.query(SimulatedPosition)
@@ -950,8 +949,8 @@ class SimulationService:
         }
 
     def save_as_backtest(
-        self, session: GameSession, name: Optional[str] = None
-    ) -> "BacktestResult":
+        self, session: GameSession, name: str | None = None
+    ) -> BacktestResult:
         """Convert simulation session to BacktestResult and save it.
 
         Args:

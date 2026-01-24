@@ -6,20 +6,19 @@ Includes GameSession, SimulatedPosition, and SimulatedTrade.
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import (
     Column,
-    String,
-    Integer,
-    Numeric,
     Date,
     DateTime,
     Enum,
     ForeignKey,
-    UniqueConstraint,
     Index,
+    Integer,
+    Numeric,
+    String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -202,7 +201,7 @@ class SimulatedTrade(BaseModel):
         stock_name: str,
         quantity: int,
         price: Decimal,
-        confidence_score: Optional[Decimal] = None,
+        confidence_score: Decimal | None = None,
     ) -> "SimulatedTrade":
         """Factory method to create a BUY trade."""
         return cls(

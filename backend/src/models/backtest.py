@@ -1,6 +1,6 @@
 """BacktestResult model for storing backtest results."""
 
-from sqlalchemy import Column, String, Integer, Numeric, Date, DateTime, ForeignKey, JSON, Index
+from sqlalchemy import JSON, Column, Date, ForeignKey, Index, Integer, Numeric, String
 from sqlalchemy.orm import relationship
 
 from src.models.base import BaseModel

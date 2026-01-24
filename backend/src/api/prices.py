@@ -1,8 +1,7 @@
 """Price update API endpoints."""
 
-from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/prices", tags=["Prices"])
@@ -10,7 +9,7 @@ router = APIRouter(prefix="/prices", tags=["Prices"])
 
 class PriceUpdateRequest(BaseModel):
     """Request body for price update."""
-    stock_codes: Optional[List[str]] = None
+    stock_codes: list[str] | None = None
 
 
 class PriceUpdateResponse(BaseModel):
@@ -121,8 +120,9 @@ async def get_price_status():
     """
     Get price update status - how many stocks need updates.
     """
-    from src.services.price_updater import get_stocks_needing_update
     from datetime import date
+
+    from src.services.price_updater import get_stocks_needing_update
 
     stocks_needing_update = get_stocks_needing_update()
 

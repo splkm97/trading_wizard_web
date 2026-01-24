@@ -3,7 +3,6 @@
 
 import os
 import sqlite3
-import sys
 
 
 def get_db_path():

@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.models.user_settings import UserSettings
-from src.core.exceptions import NotFoundError
 from src.core.logging import logger
+from src.models.user_settings import UserSettings
 
 
 class SettingsService:
@@ -60,33 +58,33 @@ class SettingsService:
         self,
         user_id: str,
         # Risk Management
-        max_positions: Optional[int] = None,
-        max_position_pct: Optional[float] = None,
-        stop_loss_pct: Optional[float] = None,
-        confidence_threshold: Optional[int] = None,
+        max_positions: int | None = None,
+        max_position_pct: float | None = None,
+        stop_loss_pct: float | None = None,
+        confidence_threshold: int | None = None,
         # Take Profit Settings
-        take_profit_enabled: Optional[bool] = None,
-        take_profit_pct: Optional[float] = None,
-        take_profit_ratio: Optional[float] = None,
+        take_profit_enabled: bool | None = None,
+        take_profit_pct: float | None = None,
+        take_profit_ratio: float | None = None,
         # Bollinger Band Parameters
-        bollinger_period: Optional[int] = None,
-        bollinger_std_dev: Optional[float] = None,
+        bollinger_period: int | None = None,
+        bollinger_std_dev: float | None = None,
         # Squeeze Detection
-        squeeze_threshold_pct: Optional[int] = None,
-        squeeze_lookback_days: Optional[int] = None,
+        squeeze_threshold_pct: int | None = None,
+        squeeze_lookback_days: int | None = None,
         # Advanced Squeeze Settings
-        expansion_threshold_pct: Optional[float] = None,
-        band_touch_tolerance: Optional[float] = None,
+        expansion_threshold_pct: float | None = None,
+        band_touch_tolerance: float | None = None,
         # Metrics Configuration
-        trading_days_per_year: Optional[int] = None,
-        days_per_year: Optional[int] = None,
+        trading_days_per_year: int | None = None,
+        days_per_year: int | None = None,
         # MACD/RSI Contrarian Strategy Settings
-        macd_rsi_rsi_period: Optional[int] = None,
-        macd_rsi_rsi_threshold: Optional[float] = None,
-        macd_rsi_macd_fast_period: Optional[int] = None,
-        macd_rsi_macd_slow_period: Optional[int] = None,
-        macd_rsi_macd_signal_period: Optional[int] = None,
-        macd_rsi_confidence_threshold: Optional[float] = None,
+        macd_rsi_rsi_period: int | None = None,
+        macd_rsi_rsi_threshold: float | None = None,
+        macd_rsi_macd_fast_period: int | None = None,
+        macd_rsi_macd_slow_period: int | None = None,
+        macd_rsi_macd_signal_period: int | None = None,
+        macd_rsi_confidence_threshold: float | None = None,
     ) -> tuple[UserSettings, list[dict]]:
         """
         Update user settings.

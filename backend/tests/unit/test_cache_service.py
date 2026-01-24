@@ -2,8 +2,6 @@
 
 import time
 
-import pytest
-
 
 class TestCacheService:
     """Tests for CacheService functionality."""

@@ -12,7 +12,6 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import yfinance as yf
@@ -53,7 +52,7 @@ class AsyncPriceService:
         """Convert Korean stock code to Yahoo Finance ticker format."""
         return f"{stock_code}.KS"
 
-    def _fetch_single_price(self, stock_code: str) -> Tuple[str, Optional[Decimal]]:
+    def _fetch_single_price(self, stock_code: str) -> tuple[str, Decimal | None]:
         """
         Fetch current price for a single stock.
 
@@ -92,7 +91,7 @@ class AsyncPriceService:
 
     def _fetch_historical_single(
         self, stock_code: str, days: int = 60
-    ) -> Tuple[str, Optional[pd.DataFrame]]:
+    ) -> tuple[str, pd.DataFrame | None]:
         """
         Fetch historical OHLCV data for a single stock.
 
@@ -142,8 +141,8 @@ class AsyncPriceService:
             return stock_code, None
 
     async def get_prices_batch_async(
-        self, stock_codes: List[str]
-    ) -> Dict[str, Optional[Decimal]]:
+        self, stock_codes: list[str]
+    ) -> dict[str, Decimal | None]:
         """
         Fetch current prices for multiple stocks in parallel.
 
@@ -182,8 +181,8 @@ class AsyncPriceService:
         return results
 
     async def get_historical_batch_async(
-        self, stock_codes: List[str], days: int = 60
-    ) -> Dict[str, Optional[pd.DataFrame]]:
+        self, stock_codes: list[str], days: int = 60
+    ) -> dict[str, pd.DataFrame | None]:
         """
         Fetch historical data for multiple stocks in parallel.
 
@@ -225,8 +224,8 @@ class AsyncPriceService:
         return results
 
     def get_prices_batch_sync(
-        self, stock_codes: List[str]
-    ) -> Dict[str, Optional[Decimal]]:
+        self, stock_codes: list[str]
+    ) -> dict[str, Decimal | None]:
         """
         Synchronous version of batch price fetching using ThreadPoolExecutor.
 
@@ -266,8 +265,8 @@ class AsyncPriceService:
         return results
 
     def get_historical_batch_sync(
-        self, stock_codes: List[str], days: int = 60
-    ) -> Dict[str, Optional[pd.DataFrame]]:
+        self, stock_codes: list[str], days: int = 60
+    ) -> dict[str, pd.DataFrame | None]:
         """
         Synchronous version of batch historical data fetching.
 
@@ -311,7 +310,7 @@ class AsyncPriceService:
 
 
 # Module-level singleton
-_async_price_service: Optional[AsyncPriceService] = None
+_async_price_service: AsyncPriceService | None = None
 
 
 def get_async_price_service() -> AsyncPriceService:

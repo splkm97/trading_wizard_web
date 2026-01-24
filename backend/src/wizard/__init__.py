@@ -1,11 +1,11 @@
 """Wizard module for trading recommendations."""
 
-from src.wizard.signal_scanner import SignalScanner, StockSignal
 from src.wizard.recommendation import (
-    RecommendationEngine,
     BuyRecommendation,
+    RecommendationEngine,
     SellRecommendation,
 )
+from src.wizard.signal_scanner import SignalScanner, StockSignal
 
 __all__ = [
     "SignalScanner",

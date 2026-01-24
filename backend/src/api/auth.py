@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.db.database import get_db
-from src.auth.crypto import validate_public_key_pem, compute_fingerprint, verify_signature_base64
-from src.auth.jwt import create_access_token
 from src.auth.challenge_store import challenge_store
+from src.auth.crypto import compute_fingerprint, validate_public_key_pem, verify_signature_base64
+from src.auth.jwt import create_access_token
 from src.auth.middleware import get_current_user
-from src.models.user import User
-from src.models.user_settings import UserSettings
 from src.core.exceptions import InvalidKeyError, InvalidSignatureError
 from src.core.logging import logger
+from src.db.database import get_db
+from src.models.user import User
+from src.models.user_settings import UserSettings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

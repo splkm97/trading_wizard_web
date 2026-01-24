@@ -12,8 +12,9 @@ Adds new columns for advanced backtest configuration:
 - Metrics configuration (trading_days_per_year, days_per_year)
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "004"
 down_revision = "003"

@@ -1,16 +1,16 @@
 """Watchlist API endpoints."""
 
-from typing import List, Optional
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
 from src.auth.middleware import get_current_user
 from src.db.database import get_db
 from src.models.user import User
-from src.models.watchlist import Watchlist
 from src.services.watchlist_service import WatchlistService
 from src.wizard.signal_scanner import SignalScanner, fetch_stock_data
-import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
@@ -19,10 +19,10 @@ router = APIRouter(prefix="/watchlists", tags=["watchlists"])
 class WatchlistItem(BaseModel):
     stock_code: str
     stock_name: str
-    current_price: Optional[dict]
-    indicators: Optional[dict]
-    recommendation_score: Optional[int]
-    recommendation_reason: Optional[str]
+    current_price: dict | None
+    indicators: dict | None
+    recommendation_score: int | None
+    recommendation_reason: str | None
     added_at: str
 
 
@@ -31,7 +31,7 @@ class AddToWatchlistRequest(BaseModel):
     stock_name: str
 
 
-@router.get("", response_model=List[WatchlistItem])
+@router.get("", response_model=list[WatchlistItem])
 async def get_watchlist(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

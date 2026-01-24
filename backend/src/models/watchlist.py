@@ -1,8 +1,10 @@
 """Watchlist model for user's stock watchlists with insights."""
 
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Index, Text
+
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from src.models.base import BaseModel, TimestampMixin
 
 

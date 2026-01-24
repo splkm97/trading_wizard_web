@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -51,7 +50,7 @@ class AppliedContrarianSettings(BaseModel):
 
 class ContrarianSignalsResponse(BaseModel):
     """Response for contrarian signals endpoint."""
-    signals: List[ContrarianSignal]
+    signals: list[ContrarianSignal]
     scanned_count: int
     signal_count: int
     applied_settings: AppliedContrarianSettings
@@ -60,7 +59,7 @@ class ContrarianSignalsResponse(BaseModel):
 
 class SingleContrarianSignalResponse(BaseModel):
     """Response for single stock contrarian signal."""
-    signal: Optional[ContrarianSignal]
+    signal: ContrarianSignal | None
     applied_settings: AppliedContrarianSettings
 
 
@@ -89,7 +88,7 @@ class ContrarianCandidate(BaseModel):
 
 class ContrarianCandidatesResponse(BaseModel):
     """Response for contrarian candidates (pre-signals) endpoint."""
-    candidates: List[ContrarianCandidate]
+    candidates: list[ContrarianCandidate]
     scanned_count: int
     candidate_count: int
     applied_settings: AppliedContrarianSettings
@@ -101,7 +100,7 @@ class ContrarianCandidatesResponse(BaseModel):
 @router.get("/signals", response_model=ContrarianSignalsResponse)
 async def get_contrarian_signals(
     max_results: int = Query(default=10, ge=1, le=50),
-    scan_date: Optional[str] = Query(default=None, description="Date to scan for signals (YYYY-MM-DD). Defaults to today."),
+    scan_date: str | None = Query(default=None, description="Date to scan for signals (YYYY-MM-DD). Defaults to today."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -206,7 +205,7 @@ async def get_contrarian_signals(
 @router.get("/candidates", response_model=ContrarianCandidatesResponse)
 async def get_contrarian_candidates(
     max_results: int = Query(default=20, ge=1, le=50),
-    scan_date: Optional[str] = Query(default=None, description="Date to scan for candidates (YYYY-MM-DD). Defaults to today."),
+    scan_date: str | None = Query(default=None, description="Date to scan for candidates (YYYY-MM-DD). Defaults to today."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

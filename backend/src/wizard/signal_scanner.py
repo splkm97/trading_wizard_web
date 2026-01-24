@@ -16,7 +16,6 @@ import warnings
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import pandas as pd
 import yfinance as yf
@@ -37,7 +36,7 @@ class StockSignal:
     confidence_score: float  # Changed from int to float for precision (3 decimal places)
     current_price: float
     reason: str
-    indicators: Dict[str, float]
+    indicators: dict[str, float]
 
     def to_dict(self) -> dict:
         return {
@@ -62,7 +61,7 @@ def get_stock_name(stock_code: str) -> str:
     for path in possible_paths:
         if path.exists():
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     names = json.load(f)
                 if stock_code in names:
                     return names[stock_code]
@@ -81,7 +80,7 @@ def get_stock_name(stock_code: str) -> str:
     return stock_code
 
 
-def load_kospi_top100(filepath: str = "kospi_top100.txt") -> List[str]:
+def load_kospi_top100(filepath: str = "kospi_top100.txt") -> list[str]:
     """Load KOSPI Top 100 stock codes from file."""
     # In Docker container: /app/src/wizard/signal_scanner.py -> /app/data/
     # Parent chain: wizard -> src -> app (3 levels up)
@@ -97,7 +96,7 @@ def load_kospi_top100(filepath: str = "kospi_top100.txt") -> List[str]:
 
     for path in possible_paths:
         if path.exists():
-            with open(path, "r") as f:
+            with open(path) as f:
                 stocks = [line.strip() for line in f if line.strip() and not line.startswith("#")]
             return [s for s in stocks if s][:100]
 
@@ -112,7 +111,7 @@ FETCH_INTERVAL_MINUTES = 30
 
 def fetch_stock_data_from_db(
     stock_code: str, days: int = 60, engine=None
-) -> tuple[Optional[pd.DataFrame], Optional[datetime]]:
+) -> tuple[pd.DataFrame | None, datetime | None]:
     """
     Fetch OHLCV data from PostgreSQL database (fast).
 
@@ -124,7 +123,6 @@ def fetch_stock_data_from_db(
     Returns:
         Tuple of (DataFrame with OHLCV data or None, last_fetched_at or None)
     """
-    from datetime import datetime
 
     end_date = date.today()
     start_date = end_date - timedelta(days=days + 30)
@@ -191,7 +189,7 @@ def fetch_stock_data_from_db(
         return None, None
 
 
-def fetch_stock_data(stock_code: str, days: int = 60) -> Optional[pd.DataFrame]:
+def fetch_stock_data(stock_code: str, days: int = 60) -> pd.DataFrame | None:
     """Fetch OHLCV data from Yahoo Finance (fallback)."""
     end_date = date.today() + timedelta(days=1)  # yf.download end is exclusive
     start_date = end_date - timedelta(days=days + 30)
@@ -462,7 +460,7 @@ class SignalScanner:
         self.max_positions = max_positions
         self.max_position_pct = max_position_pct
 
-    def _get_stock_data(self, stock_code: str, force_fetch: bool = False) -> Optional[pd.DataFrame]:
+    def _get_stock_data(self, stock_code: str, force_fetch: bool = False) -> pd.DataFrame | None:
         """
         Get stock data with PostgreSQL + yfinance strategy.
 
@@ -504,7 +502,7 @@ class SignalScanner:
         # 4. Fetch from yfinance and save to DB
         return self._fetch_and_save(stock_code)
 
-    def _fetch_and_save(self, stock_code: str) -> Optional[pd.DataFrame]:
+    def _fetch_and_save(self, stock_code: str) -> pd.DataFrame | None:
         """
         Fetch stock data from yfinance and save to DB.
 
@@ -538,7 +536,7 @@ class SignalScanner:
             stock_code: 6-digit stock code
             df: DataFrame with OHLCV data
         """
-        from src.services.price_updater import save_closing_price, get_db_engine
+        from src.services.price_updater import get_db_engine, save_closing_price
 
         engine = get_db_engine()
         if engine is None:
@@ -563,11 +561,11 @@ class SignalScanner:
 
     def scan_for_buy_signals(
         self,
-        stock_codes: List[str],
-        existing_positions: Optional[List[str]] = None,
+        stock_codes: list[str],
+        existing_positions: list[str] | None = None,
         max_results: int = 10,
         force_fetch: bool = False,
-    ) -> List[StockSignal]:
+    ) -> list[StockSignal]:
         """Scan for BUY signals on stocks without positions.
 
         Args:
@@ -628,7 +626,7 @@ class SignalScanner:
         signals.sort(key=lambda x: x.confidence_score, reverse=True)
         return signals[:max_results]
 
-    def scan_single_stock(self, stock_code: str) -> Optional[StockSignal]:
+    def scan_single_stock(self, stock_code: str) -> StockSignal | None:
         """Scan a single stock for signals."""
         df = self._get_stock_data(stock_code)
         if df is None or len(df) < 35:
@@ -682,8 +680,8 @@ class SignalScanner:
 
     def scan_for_sell_signals(
         self,
-        positions: List[dict],
-    ) -> List[StockSignal]:
+        positions: list[dict],
+    ) -> list[StockSignal]:
         signals = []
 
         for pos in positions:
@@ -800,12 +798,12 @@ class SignalScanner:
 
     def scan_for_contrarian_signals(
         self,
-        stock_codes: List[str],
+        stock_codes: list[str],
         rsi_threshold: float = 30.0,
         confidence_threshold: float = 40.0,
         max_results: int = 10,
-        target_date: Optional[date] = None,
-    ) -> List[StockSignal]:
+        target_date: date | None = None,
+    ) -> list[StockSignal]:
         """
         Scan for MACD/RSI contrarian BUY signals.
 
@@ -900,12 +898,12 @@ class SignalScanner:
 
     def scan_for_contrarian_candidates(
         self,
-        stock_codes: List[str],
+        stock_codes: list[str],
         rsi_threshold_max: float = 40.0,
         confidence_threshold: float = 20.0,
         max_results: int = 20,
-        target_date: Optional[date] = None,
-    ) -> List[StockSignal]:
+        target_date: date | None = None,
+    ) -> list[StockSignal]:
         """
         Scan for MACD/RSI contrarian PRE-SIGNAL candidates.
 
@@ -1106,7 +1104,7 @@ class SignalScanner:
 
         return min(confidence, 100.0)
 
-    def get_current_prices(self, stock_codes: List[str]) -> Dict[str, float]:
+    def get_current_prices(self, stock_codes: list[str]) -> dict[str, float]:
         """Get current prices for a list of stocks."""
         prices = {}
         for stock_code in stock_codes:

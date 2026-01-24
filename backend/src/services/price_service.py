@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+
 import yfinance as yf
 
 from src.core.logging import logger
@@ -28,7 +27,7 @@ class PriceService:
         """
         return f"{stock_code}{PriceService.KRX_SUFFIX}"
 
-    def get_current_price(self, stock_code: str) -> Optional[Decimal]:
+    def get_current_price(self, stock_code: str) -> Decimal | None:
         """Get current price for a stock.
 
         Args:
@@ -54,7 +53,7 @@ class PriceService:
             logger.error(f"Failed to fetch price for {stock_code}: {e}")
             return None
 
-    def get_prices_batch(self, stock_codes: list[str]) -> dict[str, Optional[Decimal]]:
+    def get_prices_batch(self, stock_codes: list[str]) -> dict[str, Decimal | None]:
         """Get current prices for multiple stocks.
 
         Args:

@@ -1,10 +1,10 @@
 """Watchlist service for managing stock watchlists with insights."""
 
-from typing import List, Optional
-from sqlalchemy.orm import Session
-from src.models.watchlist import Watchlist
-from src.core.indicators import calculate_all_indicators
 import json
+
+from sqlalchemy.orm import Session
+
+from src.models.watchlist import Watchlist
 
 
 class WatchlistService:
@@ -45,7 +45,7 @@ class WatchlistService:
         self.db.commit()
         return True
 
-    def get_user_watchlist(self, user_id: str) -> List[Watchlist]:
+    def get_user_watchlist(self, user_id: str) -> list[Watchlist]:
         """Get all watchlist entries for user."""
         return (
             self.db.query(Watchlist)
@@ -59,8 +59,8 @@ class WatchlistService:
         watchlist_id: str,
         price_data: dict,
         indicators: dict,
-        score: Optional[int] = None,
-        reason: Optional[str] = None,
+        score: int | None = None,
+        reason: str | None = None,
     ):
         """Update price and insights for watchlist entry."""
         watchlist = self.db.query(Watchlist).filter(Watchlist.id == watchlist_id).first()

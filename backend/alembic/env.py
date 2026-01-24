@@ -2,14 +2,14 @@
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from src.db.database import Base
+from alembic import context
 from src.core.config import settings
+from src.db.database import Base
 
 # Import all models to register them
-from src.models import user, user_settings, backtest, game_session  # noqa: F401
+from src.models import backtest, game_session, user, user_settings  # noqa: F401
 
 config = context.config
 

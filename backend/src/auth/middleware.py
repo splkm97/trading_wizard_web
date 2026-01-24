@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from src.db.database import get_db
 from src.auth.jwt import decode_access_token
-from src.models.user import User
 from src.core.exceptions import AuthenticationError
+from src.db.database import get_db
+from src.models.user import User
 
 # Bearer token security scheme
 security = HTTPBearer()

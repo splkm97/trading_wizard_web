@@ -7,7 +7,6 @@ Tests:
 3. Signal Scanner DB-first strategy
 """
 
-import os
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -166,8 +165,9 @@ class TestSignalScannerDBFirst:
 
     def test_signal_scanner_get_stock_data_tries_db_first(self):
         """Test that SignalScanner._get_stock_data tries DB before yfinance."""
-        from src.wizard.signal_scanner import SignalScanner
         from datetime import datetime
+
+        from src.wizard.signal_scanner import SignalScanner
 
         scanner = SignalScanner()
 

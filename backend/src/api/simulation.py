@@ -3,29 +3,28 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.db.database import get_db
 from src.auth.middleware import get_current_user
-from src.models.user import User
+from src.db.database import get_db
 from src.models.game_session import GameStatus
+from src.models.user import User
 from src.services.simulation_service import (
-    SimulationService,
-    InsufficientFundsError,
     DuplicateBuyError,
-    InvalidDateRangeError,
     GameNotFoundError,
+    InsufficientFundsError,
+    InvalidDateRangeError,
+    SimulationService,
 )
 
 router = APIRouter(prefix="/simulation", tags=["Simulation"])
 
 
 class CreateSessionRequest(BaseModel):
-    name: Optional[str] = Field(None, max_length=100)
+    name: str | None = Field(None, max_length=100)
     start_date: date
     end_date: date
     initial_capital: float = Field(100_000_000, gt=0)
@@ -33,7 +32,7 @@ class CreateSessionRequest(BaseModel):
 
 class GameSessionResponse(BaseModel):
     id: str
-    name: Optional[str]
+    name: str | None
     start_date: str
     end_date: str
     current_date: str
@@ -54,10 +53,10 @@ class PositionResponse(BaseModel):
     quantity: int
     avg_entry_price: float
     entry_date: str
-    current_price: Optional[float] = None
-    current_value: Optional[float] = None
-    unrealized_pnl: Optional[float] = None
-    unrealized_pnl_pct: Optional[float] = None
+    current_price: float | None = None
+    current_value: float | None = None
+    unrealized_pnl: float | None = None
+    unrealized_pnl_pct: float | None = None
 
 
 class GameSessionWithSummaryResponse(GameSessionResponse):
@@ -73,8 +72,8 @@ class GameSessionWithSummaryResponse(GameSessionResponse):
 class ExecuteTradeRequest(BaseModel):
     stock_code: str
     action: str = Field(..., pattern="^(BUY|SELL)$")
-    quantity: Optional[int] = Field(None, gt=0)
-    amount: Optional[float] = Field(None, gt=0)
+    quantity: int | None = Field(None, gt=0)
+    amount: float | None = Field(None, gt=0)
 
 
 class ExecuteTradeResponse(BaseModel):
@@ -91,9 +90,9 @@ class SimulatedTradeResponse(BaseModel):
     quantity: int
     price: float
     total_amount: float
-    realized_pnl: Optional[float]
-    realized_pnl_pct: Optional[float]
-    confidence_score: Optional[float]
+    realized_pnl: float | None
+    realized_pnl_pct: float | None
+    confidence_score: float | None
     created_at: str
 
     class Config:
@@ -158,7 +157,7 @@ async def create_session(
 
 @router.get("/sessions", response_model=list[GameSessionResponse])
 async def list_sessions(
-    status_filter: Optional[str] = None,
+    status_filter: str | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -280,6 +279,7 @@ async def execute_trade(
 ):
     """Execute a trade (buy or sell)."""
     from decimal import Decimal
+
     from src.services.stock_service import stock_service
 
     service = SimulationService(db)
@@ -520,7 +520,7 @@ async def precompute_recommendations(
 
 
 class SaveAsBacktestRequest(BaseModel):
-    name: Optional[str] = Field(None, max_length=100, description="Custom name for backtest record")
+    name: str | None = Field(None, max_length=100, description="Custom name for backtest record")
 
 
 class SaveAsBacktestResponse(BaseModel):

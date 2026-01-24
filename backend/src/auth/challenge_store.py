@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import secrets
 import base64
+import secrets
 from datetime import datetime, timedelta
 from threading import Lock
 

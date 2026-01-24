@@ -1,14 +1,15 @@
 """Unit tests for MACD/RSI contrarian signal detection."""
 
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
-from unittest.mock import patch, MagicMock
 
 from src.wizard.signal_scanner import (
+    SignalScanner,
     calculate_contrarian_confidence,
     detect_macd_golden_cross,
     format_contrarian_reason_detail,
-    SignalScanner,
 )
 
 

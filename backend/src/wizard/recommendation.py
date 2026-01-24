@@ -5,7 +5,6 @@ Recommendation generation for daily wizard.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List
 
 from src.wizard.signal_scanner import StockSignal
 
@@ -21,7 +20,7 @@ class BuyRecommendation:
     total_cost: float
     confidence_score: float  # Changed from int to float for precision
     reason: str
-    indicators: Dict[str, float]
+    indicators: dict[str, float]
 
     def to_dict(self) -> dict:
         return {
@@ -48,7 +47,7 @@ class SellRecommendation:
     expected_pnl: float
     pnl_pct: float
     reason: str
-    indicators: Dict[str, float]
+    indicators: dict[str, float]
 
     def to_dict(self) -> dict:
         return {
@@ -79,11 +78,11 @@ class RecommendationEngine:
 
     def generate_buy_recommendations(
         self,
-        signals: List[StockSignal],
+        signals: list[StockSignal],
         available_cash: float,
         current_position_count: int = 0,
         initial_capital: float = 1_000_000,
-    ) -> List[BuyRecommendation]:
+    ) -> list[BuyRecommendation]:
         """Generate BUY recommendations with position sizing."""
         recommendations = []
         available_slots = self.max_positions - current_position_count
@@ -160,7 +159,7 @@ def format_buy_reason_detail(rec: BuyRecommendation) -> str:
     return "\n".join(lines)
 
 
-def format_signal_reason_detail(sig: "StockSignal") -> str:
+def format_signal_reason_detail(sig: StockSignal) -> str:
     """Generate detailed explanation for BUY signal (regardless of affordability)."""
     ind = sig.indicators
 

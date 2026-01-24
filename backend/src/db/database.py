@@ -1,7 +1,7 @@
 """Database configuration and session management."""
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from src.core.config import settings
 
@@ -30,13 +30,5 @@ def get_db():
 def init_db():
     """Initialize database tables."""
     # Import all models to register them with Base
-    from src.models import (
-        user,
-        backtest,
-        user_settings,
-        game_session,
-        historical_price,
-        watchlist,
-    )  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

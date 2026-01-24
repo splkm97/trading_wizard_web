@@ -3,15 +3,15 @@
 from fastapi import APIRouter
 
 from src.api import (
-    health,
     auth,
-    stocks,
-    recommendations,
     backtest,
+    contrarian,
+    health,
+    prices,
+    recommendations,
     settings,
     simulation,
-    contrarian,
-    prices,
+    stocks,
     watchlist,
 )
 
